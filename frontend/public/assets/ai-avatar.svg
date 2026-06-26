@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" fill="none">
+  <rect width="320" height="320" rx="24" fill="#EFF6FF"/>
+  <circle cx="160" cy="120" r="50" fill="#BFDBFE" stroke="#2563EB" stroke-width="3"/>
+  <path d="M160 90 L175 115 L160 110 L145 115Z" fill="#2563EB"/>
+  <circle cx="148" cy="112" r="5" fill="#2563EB"/>
+  <circle cx="172" cy="112" r="5" fill="#2563EB"/>
+  <path d="M145 130 Q160 145 175 130" stroke="#2563EB" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="130" y="180" width="60" height="70" rx="12" fill="#BFDBFE" stroke="#2563EB" stroke-width="3"/>
+  <rect x="142" y="195" width="10" height="10" rx="2" fill="#2563EB"/>
+  <rect x="168" y="195" width="10" height="10" rx="2" fill="#2563EB"/>
+  <rect x="142" y="215" width="36" height="8" rx="2" fill="#2563EB" opacity="0.5"/>
+  <line x1="130" y1="210" x2="100" y2="230" stroke="#2563EB" stroke-width="3" stroke-linecap="round"/>
+  <line x1="190" y1="210" x2="220" y2="230" stroke="#2563EB" stroke-width="3" stroke-linecap="round"/>
+  <text x="160" y="290" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="bold" fill="#2563EB">SWAIS</text>
+</svg>
