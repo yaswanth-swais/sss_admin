@@ -29,6 +29,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchType, setSearchType] = useState<'name' | 'id' | 'subject'>('name');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'add' | 'modify'>('add');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -238,7 +239,7 @@ export default function StudentsPage() {
         <button onClick={() => {
           if (filteredStudents.length === 1) openModal('modify', filteredStudents[0]);
           else if (filteredStudents.length > 0) {
-            const id = Number(prompt('Enter Student ID to modify:'));
+            const id = (prompt('Enter Student ID to modify:'));
             const student = students.find(s => s.id === id);
             if (student) openModal('modify', student);
             else alert('Student not found!');
@@ -248,10 +249,28 @@ export default function StudentsPage() {
         </button>
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40" size={20} />
-        <input type="text" placeholder="Search by name, ID, class, section, or parent..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white" />
-      </div>
+      <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex-1 min-w-[200px] relative">
+            <input
+              type="text"
+              placeholder="Search by name, ID, class, or section..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40 pr-10"
+            />
+            
+          </div>
+          <select
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value as any)}
+            className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-white/40"
+          >
+            <option value="name">Search by Name</option>
+            <option value="id">Search by ID</option>
+            <option value="class">Search by Class</option>
+            <option value="section">Search by Section</option>
+          </select>
+        </div>
 
       <div className="bg-white/5 backdrop-blur-xl rounded-2xl overflow-x-auto">
         <table className="w-full min-w-[1600px]">

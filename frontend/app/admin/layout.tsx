@@ -5,14 +5,14 @@ import { motion } from 'framer-motion';
 import { 
   Users, 
   BookOpen,
-  Settings, 
-  GraduationCap,
+  Settings,
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import SessionManager from '../../components/SessionManager';
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function AdminLayout({
   children,
@@ -21,6 +21,13 @@ export default function AdminLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    router.push('/login');
+  };
 
   const menuItems = [
     { id: 'students', name: 'Students', icon: Users, path: '/admin/students', color: 'from-blue-500 to-cyan-500' },
@@ -29,86 +36,117 @@ export default function AdminLayout({
   ];
 
   return (
-    <SessionManager>
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-        {/* Sidebar - same as before */}
-        <motion.aside 
-          initial={false}
-          animate={{ width: sidebarOpen ? '280px' : '80px' }}
-          className="fixed left-0 top-0 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 z-50"
-        >
-          {/* Sidebar content - same as before */}
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-10">
-              {sidebarOpen && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-3"
-                >
-                  <div className="p-2 rounded-xl">
-                    <img className="rounded-xl w-13 h-13" src="https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"/>
-                  </div>
-                  <div>
-                    <h1 className="text-white font-bold text-xl">SSS School</h1>
-                    <p className="text-white/40 text-xs">Admin Portal</p>
-                  </div>
-                </motion.div>
-              )}
-              <button 
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="text-white/70 hover:text-white transition-colors"
-              >
-                {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
-            </div>
-
-            <nav className="space-y-2">
-              {menuItems.map((item) => {
-                const isActive = pathname === item.path;
-                return (
-                  <Link href={item.path} key={item.id}>
-                    <motion.div
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-                        isActive 
-                          ? `bg-gradient-to-r ${item.color} text-white shadow-lg` 
-                          : 'text-white/60 hover:text-white hover:bg-white/10'
-                      }`}
-                      whileHover={{ x: 5 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <item.icon size={20} />
-                      {sidebarOpen && <span className="font-medium">{item.name}</span>}
-                    </motion.div>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="absolute bottom-8 left-0 right-0 px-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+      {/* Sidebar */}
+      <motion.aside 
+        initial={false}
+        animate={{ width: sidebarOpen ? '280px' : '80px' }}
+        className="fixed left-0 top-0 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 z-50"
+      >
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-8">
             {sidebarOpen && (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="p-4 bg-white/5 rounded-xl border border-white/10"
+                className="flex flex-col items-center w-full"
               >
-                <p className="text-white/30 text-xs text-center">
-                  © 2026 SSS School<br />
-                  Management System
-                </p>
+                {/* SSS Logo */}
+                <div className="w-20 h-20 relative rounded-full overflow-hidden border-2 border-yellow-400/40 shadow-lg shadow-yellow-500/20 bg-white/5">
+                  <img
+                    src="https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
+                    alt="SSS School Logo"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="text-center mt-2">
+                  <h1 className="text-white font-bold text-xl">SSS School</h1>
+                  <p className="text-white/40 text-[10px] uppercase tracking-wider">Admin Portal</p>
+                </div>
               </motion.div>
             )}
+            {!sidebarOpen && (
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="text-white/70 hover:text-white transition-colors"
+              >
+                <Menu size={24} />
+              </button>
+            )}
           </div>
-        </motion.aside>
 
-        {/* Main Content */}
-        <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-[280px]' : 'ml-[80px]'}`}>
-          <div className="p-8">
-            {children}
+          <nav className="space-y-2 mt-4">
+            {menuItems.map((item) => {
+              const isActive = pathname === item.path;
+              return (
+                <Link href={item.path} key={item.id}>
+                  <motion.div
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
+                      isActive 
+                        ? `bg-gradient-to-r ${item.color} text-white shadow-lg` 
+                        : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                    whileHover={{ x: 5 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <item.icon size={20} />
+                    {sidebarOpen && <span className="font-medium">{item.name}</span>}
+                  </motion.div>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Logout Button */}
+        <div className="absolute bottom-12 left-0 right-0 px-6">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <LogOut size={20} />
+            {sidebarOpen && <span className="font-medium">Logout</span>}
+          </button>
+        </div>
+      </motion.aside>
+
+      {/* Main Content */}
+      <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-[280px]' : 'ml-[80px]'}`}>
+        {/* Welcome Header with Logo */}
+        <div className="bg-white/5 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40">
+          <div className="px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <span>👋</span>
+                  Welcome, Admin!
+                </h2>
+                <p className="text-white/50 text-sm mt-1">
+                  Here's what's happening with SSS School today
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                {/* SSS Logo in Header */}
+                <div className="w-12 h-12 relative rounded-full overflow-hidden border border-yellow-400/20">
+                  <img
+                    src= "https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
+                    alt="SSS School Logo"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="text-right">
+                  <p className="text-white text-sm font-medium">Admin</p>
+                  <p className="text-white/40 text-xs">SSS School</p>
+                </div>
+              </div>
+            </div>
           </div>
-        </main>
-      </div>
-    </SessionManager>
+        </div>
+
+        <div className="p-8">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }

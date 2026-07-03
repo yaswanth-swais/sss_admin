@@ -25,7 +25,7 @@ export async function POST(request) {
     // Query the database for the user
     const users = await pool`
       SELECT user_id, email, username, role, is_active, password_hash
-      FROM users_master 
+      FROM sss_users_master 
       WHERE email = ${email}
     `;
 

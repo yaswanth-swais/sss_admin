@@ -1,67 +1,107 @@
 import { NextResponse } from 'next/server';
-import postgres from 'postgres';
+import postgres from "postgres";
 
-export const dynamic = 'force-dynamic';
-
-const sql = postgres(process.env.DATABASE_URL, { 
-  ssl: 'require'
+const sql = postgres(process.env.DATABASE_URL, {
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-export async function GET(request) {
+export async function GET() {
   try {
     const notices = await sql`
       SELECT 
         notice_id as id,
         notice_title as title,
-        notice_text as description,
-        applicable_class as targetAudience,
-        notice_date as noticeDate,
-        created_datetime as createdAt,
-        CASE WHEN record_status = 'Active' THEN 'active' ELSE 'inactive' END as status
+        notice_text as message,
+        applicable_class as role,
+        notice_date as date,
+        record_status as status,
+        is_read
       FROM sss_notice_board
-      WHERE record_status = 'Active' OR record_status IS NULL
-      ORDER BY notice_id DESC
-      LIMIT 100
+      WHERE record_status = 'Active'
+      ORDER BY notice_date DESC
     `;
-    
-    return NextResponse.json({ success: true, notices: notices });
+    return NextResponse.json(notices);
   } catch (error) {
-    console.error('Database Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Database error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { title, description, targetAudience, noticeDate, status } = body;
+    const { title, message, role, date } = body;
     
-    const isActive = status === 'active';
-    const currentDate = noticeDate || new Date().toISOString().split('T')[0];
-    
-    const result = await sql`
+    const notice = await sql`
       INSERT INTO sss_notice_board (
         notice_title,
         notice_text,
         applicable_class,
         notice_date,
-        created_datetime,
-        record_status
+        record_status,
+        is_read
       )
+
       VALUES (
-        ${title}, 
-        ${description || null},
-        ${targetAudience || null},
-        ${currentDate},
-        NOW(),
-        'Active'
+        ${title},
+        ${message},
+        ${role || "all"},
+        ${date || new Date().toISOString().split("T")[0]},
+        'Active',
+        true
       )
-      RETURNING notice_id as id
-    `;
-    
-    return NextResponse.json({ success: true, message: 'Notice added successfully', notice: result[0] });
+
+      RETURNING *
+      `;
+
+    return NextResponse.json(notice[0], {
+    status:201
+    });
   } catch (error) {
-    console.error('Error inserting notice:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Error adding notice:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const { id, title, message, role, date } = body;
+    
+    const updated = await sql`
+    UPDATE sss_notice_board
+
+    SET
+
+    notice_title=${title},
+    notice_text=${message},
+    applicable_class=${role},
+    notice_date=${date}
+
+    WHERE notice_id=${id}
+
+    RETURNING *
+    `;
+
+    return NextResponse.json(updated[0]);
+  } catch (error) {
+    console.error('Error updating notice:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    await sql
+      `UPDATE sss_notice_board SET record_status = 'Deleted' WHERE notice_id = ${id}`;
+    
+    return NextResponse.json({ message: 'Notice deleted successfully' });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

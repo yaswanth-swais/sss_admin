@@ -28,6 +28,7 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchType, setSearchType] = useState<'name' | 'id' | 'subject'>('name');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'add' | 'modify'>('add');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
@@ -131,7 +132,7 @@ export default function TeachersPage() {
   };
 
   const handleToggleStatus = async (id: string) => {
-    const teacher = teachers.find(t => t.id   === Number(id));
+    const teacher = teachers.find(t => t.id   === (id));
     if (teacher) {
       const newStatus = teacher.status === 'active' ? 'inactive' : 'active';
       try {
@@ -220,7 +221,7 @@ export default function TeachersPage() {
         <button onClick={() => {
           if (filteredTeachers.length === 1) openModal('modify', filteredTeachers[0]);
           else if (filteredTeachers.length > 0) {
-            const id = Number(prompt('Enter Teacher ID to modify:'));
+            const id = (prompt('Enter Teacher ID to modify:'));
             const teacher = teachers.find(t => t.id === id);
             if (teacher) openModal('modify', teacher);
             else alert('Teacher not found!');
@@ -230,10 +231,26 @@ export default function TeachersPage() {
         </button>
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40" size={20} />
-        <input type="text" placeholder="Search by name, ID, or subject..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white" />
-      </div>
+      <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex-1 min-w-[200px] relative">
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40 pr-10"
+            />  
+          </div>
+          <select
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value as any)}
+            className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-white/40"
+          >
+            <option value="name">Search by Name</option>
+            <option value="id">Search by ID</option>
+            <option value="subject">Search by Subject</option>
+          </select>
+        </div>
 
       <div className="bg-white/5 backdrop-blur-xl rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">

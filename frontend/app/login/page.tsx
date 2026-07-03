@@ -110,7 +110,6 @@ export default function LoginPage() {
 
         <div className="mt-4 text-center">
           <p className="text-white/40 text-xs">Demo: admin@sss.com / admin123 (Admin)</p>
-          <p className="text-white/40 text-xs">Demo: teacher@sss.com / teacher123 (Teacher)</p>
         </div>
 
         <p className="text-white/30 text-xs text-center mt-6">
