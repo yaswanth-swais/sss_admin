@@ -1,18 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
   BookOpen,
   Settings,
   Menu,
-  X,
   LogOut
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 export default function AdminLayout({
   children,
@@ -21,12 +19,14 @@ export default function AdminLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const pathname = usePathname();
-  const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    router.push('/login');
+    if (window.confirm('Are you sure you want to logout from this page?')) {
+      localStorage.clear();
+      sessionStorage.clear();
+      // Redirect to SSS login portal
+      window.location.href = 'https://staging.sss.swais.in';
+    }
   };
 
   const menuItems = [
@@ -41,9 +41,9 @@ export default function AdminLayout({
       <motion.aside 
         initial={false}
         animate={{ width: sidebarOpen ? '280px' : '80px' }}
-        className="fixed left-0 top-0 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 z-50"
+        className="fixed left-0 top-0 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 z-50 overflow-hidden"
       >
-        <div className="p-6">
+        <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-8">
             {sidebarOpen && (
               <motion.div 
@@ -52,11 +52,11 @@ export default function AdminLayout({
                 className="flex flex-col items-center w-full"
               >
                 {/* SSS Logo */}
-                <div className="w-20 h-20 relative rounded-full overflow-hidden border-2 border-yellow-400/40 shadow-lg shadow-yellow-500/20 bg-white/5">
+                <div className="w-20 h-20 relative rounded-full overflow-hidden border-2 border-yellow-400/40 shadow-lg shadow-yellow-500/20 bg-white/5 flex-shrink-0">
                   <img
                     src="https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
                     alt="SSS School Logo"
-                    className="object-cover"
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="text-center mt-2">
@@ -75,7 +75,7 @@ export default function AdminLayout({
             )}
           </div>
 
-          <nav className="space-y-2 mt-4">
+          <nav className="space-y-2 flex-1">
             {menuItems.map((item) => {
               const isActive = pathname === item.path;
               return (
@@ -96,17 +96,17 @@ export default function AdminLayout({
               );
             })}
           </nav>
-        </div>
 
-        {/* Logout Button */}
-        <div className="absolute bottom-12 left-0 right-0 px-6">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <LogOut size={20} />
-            {sidebarOpen && <span className="font-medium">Logout</span>}
-          </button>
+          {/* Logout Button - Fixed at bottom */}
+          <div className="pt-4 border-t border-white/10">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <LogOut size={20} />
+              {sidebarOpen && <span className="font-medium">Logout</span>}
+            </button>
+          </div>
         </div>
       </motion.aside>
 
@@ -127,11 +127,11 @@ export default function AdminLayout({
               </div>
               <div className="flex items-center gap-4">
                 {/* SSS Logo in Header */}
-                <div className="w-12 h-12 relative rounded-full overflow-hidden border border-yellow-400/20">
+                <div className="w-12 h-12 relative rounded-full overflow-hidden border border-yellow-400/20 flex-shrink-0">
                   <img
-                    src= "https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
+                    src="https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
                     alt="SSS School Logo"
-                    className="object-cover"
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="text-right">

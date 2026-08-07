@@ -4,252 +4,366 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Pencil, Trash2, Search, X,
-  Users as UsersIcon, UserCheck, UserX,
-  BookOpen
+  Users, UserCheck, UserX, BookOpen
 } from 'lucide-react';
-
-interface Student {
-  id: string;
-  admissionNo: string;
-  name: string;
-  class: string;
-  section: string;
-  rollNo: string;
-  parentName: string;
-  parentPhone: string;
-  parentEmail: string;
-  contact: string;
-  email: string;
-  guardianName: string;
-  guardianPhone: string;
-  status: 'active' | 'inactive';
-}
+// Import the 3-step wizard
+import StudentFormWizard from '../../../components/StudentFormWizard';
 
 export default function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState<'name' | 'id' | 'subject'>('name');
+  const [searchType, setSearchType] = useState('name');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'add' | 'modify'>('add');
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [modalType, setModalType] = useState('add');
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [validationError, setValidationError] = useState('');
   const [formData, setFormData] = useState({
-    admissionNo: '',
+    admission_no: '',
     name: '',
     class: '',
     section: '',
-    rollNo: '',
-    parentName: '',
-    parentPhone: '',
-    parentEmail: '',
-    contact: '',
-    email: '',
-    guardianName: '',
-    guardianPhone: ''
+    roll_no: '',
+    parent1_name: '',
+    parent1_phone: '',
+    parent1_email: '',
+    parent2_name: '',
+    parent2_phone: '',
+    parent2_email: '',
+    student_contact: '',
+    student_email: '',
+    guardian_name: '',
+    guardian_phone: '',
+    guardian_email: '',
+    status: 'Active'
   });
+
+  // State for wizard
+  const [editingStudent, setEditingStudent] = useState(null);
 
   useEffect(() => {
     fetchStudents();
   }, []);
 
   const fetchStudents = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const response = await fetch('/api/students');
       const data = await response.json();
-      console.log('Students API Response:', data);
-      console.log('First Student:', data.students?.[0]);
-
-      if (data.success) {
-        setStudents(data.students);
+      console.log('API Response:', data);
+      
+      if (Array.isArray(data)) {
+        const mappedStudents = data.map(s => ({
+          id: s.admission_no || s.id,
+          student_id: s.admission_no || s.student_id,
+          admission_no: s.admission_no,
+          name: s.full_name || s.name,
+          full_name: s.full_name || s.name,
+          class: s.class || s.class_id || '',
+          class_id: s.class_id,
+          section: s.section || '',
+          roll_no: s.roll_no || '',
+          parent1_name: s.parent1_name || '',
+          parent1_phone: s.parent1_phone || '',
+          parent1_email: s.parent1_email || '',
+          parent2_name: s.parent2_name || '',
+          parent2_phone: s.parent2_phone || '',
+          parent2_email: s.parent2_email || '',
+          student_contact: s.student_phone || s.student_contact || '',
+          student_phone: s.student_phone || '',
+          student_email: s.student_email || '',
+          guardian_name: s.guardian_name || '',
+          guardian_phone: s.guardian_phone || '',
+          guardian_email: s.guardian_email || '',
+          status: s.record_status === 'Active' ? 'Active' : (s.status || 'Active'),
+          record_status: s.record_status || 'Active'
+        }));
+        console.log('Mapped Students:', mappedStudents);
+        setStudents(mappedStudents);
+      } else {
+        console.error('Expected array but got:', data);
+        setStudents([]);
       }
     } catch (error) {
       console.error('Error fetching students:', error);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const validateEmail = (email: string): boolean => {
-    if (!email) return true;
-    return email.toLowerCase().endsWith('@gmail.com');
+  const validateForm = () => {
+    const admissionNo = formData.admission_no.trim();
+    if (!admissionNo) {
+      setValidationError('Admission Number is required');
+      return false;
+    }
+    if (!admissionNo.match(/^S/)) {
+      setValidationError('Admission Number must start with "S" (Student)');
+      return false;
+    }
+    if (!formData.name.trim()) {
+      setValidationError('Student Name is required');
+      return false;
+    }
+    if (formData.parent1_email && !formData.parent1_email.includes('@')) {
+      setValidationError('Please enter a valid parent1 email address');
+      return false;
+    }
+    if (formData.parent2_email && !formData.parent2_email.includes('@')) {
+      setValidationError('Please enter a valid parent2 email address');
+      return false;
+    }
+    if (formData.student_email && !formData.student_email.includes('@')) {
+      setValidationError('Please enter a valid student email address');
+      return false;
+    }
+    if (formData.guardian_email && !formData.guardian_email.includes('@')) {
+      setValidationError('Please enter a valid guardian email address');
+      return false;
+    }
+    setValidationError('');
+    return true;
   };
 
   const handleAdd = async () => {
-    if (!formData.name) {
-      alert('Please fill Student Name');
-      return;
-    }
-    
-    if (formData.email && !validateEmail(formData.email)) {
-      alert('Student Email must end with @gmail.com');
-      return;
-    }
-    
-    if (formData.parentEmail && !validateEmail(formData.parentEmail)) {
-      alert('Parent Email must end with @gmail.com');
-      return;
-    }
-    
+    if (!validateForm()) return;
     try {
       const response = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, status: 'active' })
+        body: JSON.stringify({
+          admission_no: formData.admission_no,
+          full_name: formData.name,
+          class_id: formData.class,
+          section: formData.section,
+          roll_no: formData.roll_no,
+          parent1_name: formData.parent1_name,
+          parent1_phone: formData.parent1_phone,
+          parent1_email: formData.parent1_email,
+          parent2_name: formData.parent2_name,
+          parent2_phone: formData.parent2_phone,
+          parent2_email: formData.parent2_email,
+          student_phone: formData.student_contact,
+          student_email: formData.student_email,
+          guardian_name: formData.guardian_name,
+          guardian_phone: formData.guardian_phone,
+          guardian_email: formData.guardian_email
+        })
       });
-      const data = await response.json();
-      if (data.success) {
-        await fetchStudents();
+      if (response.ok) {
+        fetchStudents();
         setIsModalOpen(false);
         resetForm();
       } else {
-        alert('Error: ' + data.error);
+        const error = await response.json();
+        setValidationError(error.error || 'Failed to add student');
       }
     } catch (error) {
       console.error('Error adding student:', error);
-      alert('Error adding student');
+      setValidationError('Failed to add student');
     }
   };
 
   const handleModify = async () => {
+    if (!validateForm()) return;
     if (selectedStudent) {
       try {
-        const response = await fetch(`/api/students/${selectedStudent.id}`, {
+        const response = await fetch('/api/students', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            admission_no: formData.admission_no,
+            full_name: formData.name,
+            class_id: formData.class,
+            section: formData.section,
+            roll_no: formData.roll_no,
+            parent1_name: formData.parent1_name,
+            parent1_phone: formData.parent1_phone,
+            parent1_email: formData.parent1_email,
+            parent2_name: formData.parent2_name,
+            parent2_phone: formData.parent2_phone,
+            parent2_email: formData.parent2_email,
+            student_phone: formData.student_contact,
+            student_email: formData.student_email,
+            guardian_name: formData.guardian_name,
+            guardian_phone: formData.guardian_phone,
+            guardian_email: formData.guardian_email,
+            id: selectedStudent.id
+          })
         });
-        const data = await response.json();
-        if (data.success) {
-          await fetchStudents();
+        if (response.ok) {
+          fetchStudents();
           setIsModalOpen(false);
           resetForm();
         } else {
-          alert('Error: ' + data.error);
+          const error = await response.json();
+          setValidationError(error.error || 'Failed to update student');
         }
       } catch (error) {
-        console.error('Error modifying student:', error);
-        alert('Error modifying student');
+        console.error('Error updating student:', error);
+        setValidationError('Failed to update student');
       }
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this student?')) {
       try {
-        await fetch(`/api/students/${id}`, { method: 'DELETE' });
-        await fetchStudents();
+        await fetch(`/api/students?id=${id}`, { method: 'DELETE' });
+        fetchStudents();
       } catch (error) {
         console.error('Error deleting student:', error);
       }
     }
   };
 
-  const handleToggleStatus = async (id: string) => {
-    const student = students.find(s => s.id === id);
-    if (student) {
-      const newStatus = student.status === 'active' ? 'inactive' : 'active';
-      try {
-        await fetch(`/api/students/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus })
-        });
-        await fetchStudents();
-      } catch (error) {
-        console.error('Error toggling status:', error);
-      }
+  const handleToggleStatus = async (student) => {
+    const newStatus = student.status === 'Active' ? 'Inactive' : 'Active';
+    try {
+      await fetch('/api/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          admission_no: student.admission_no,
+          status: newStatus 
+        })
+      });
+      fetchStudents();
+    } catch (error) {
+      console.error('Error updating status:', error);
     }
   };
 
   const resetForm = () => {
     setFormData({
-      admissionNo: '', name: '', class: '', section: '', rollNo: '',
-      parentName: '', parentPhone: '', parentEmail: '',
-      contact: '', email: '', guardianName: '', guardianPhone: ''
+      admission_no: '',
+      name: '',
+      class: '',
+      section: '',
+      roll_no: '',
+      parent1_name: '',
+      parent1_phone: '',
+      parent1_email: '',
+      parent2_name: '',
+      parent2_phone: '',
+      parent2_email: '',
+      student_contact: '',
+      student_email: '',
+      guardian_name: '',
+      guardian_phone: '',
+      guardian_email: '',
+      status: 'Active'
     });
     setSelectedStudent(null);
+    setValidationError('');
   };
 
-  const openModal = (type: 'add' | 'modify', student?: Student) => {
+  const openModal = (type, student = null) => {
     setModalType(type);
-    if (type === 'modify' && student) {
+    setValidationError('');
+    if (type === 'add') {
+      resetForm();
+      setEditingStudent(null);
+    } else if (type === 'modify' && student) {
       setSelectedStudent(student);
+      setEditingStudent(student);
       setFormData({
-        admissionNo: student.admissionNo || '',
-        name: student.name,
-        class: student.class || '',
+        admission_no: student.admission_no || student.student_id || '',
+        name: student.name || student.full_name || '',
+        class: student.class || student.class_id || '',
         section: student.section || '',
-        rollNo: student.rollNo || '',
-        parentName: student.parentName || '',
-        parentPhone: student.parentPhone || '',
-        parentEmail: student.parentEmail || '',
-        contact: student.contact || '',
-        email: student.email || '',
-        guardianName: student.guardianName || '',
-        guardianPhone: student.guardianPhone || ''
+        roll_no: student.roll_no || '',
+        parent1_name: student.parent1_name || '',
+        parent1_phone: student.parent1_phone || '',
+        parent1_email: student.parent1_email || '',
+        parent2_name: student.parent2_name || '',
+        parent2_phone: student.parent2_phone || '',
+        parent2_email: student.parent2_email || '',
+        student_contact: student.student_phone || student.student_contact || '',
+        student_email: student.student_email || '',
+        guardian_name: student.guardian_name || '',
+        guardian_phone: student.guardian_phone || '',
+        guardian_email: student.guardian_email || '',
+        status: student.status || 'Active'
       });
     }
     setIsModalOpen(true);
   };
 
-  const filteredStudents = students.filter(s => 
-    (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    String(s.id).includes(searchTerm) ||
-    (s.class?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (s.section?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (s.parentName?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  // Wizard handlers
+  const handleWizardSuccess = () => {
+    fetchStudents();
+  };
 
-  const stats = [
-    { label: 'Total Students', value: students.length, icon: UsersIcon, color: 'from-blue-500 to-cyan-500' },
-    { label: 'Active Students', value: students.filter(s => s.status === 'active').length, icon: UserCheck, color: 'from-green-500 to-emerald-500' },
-    { label: 'Inactive Students', value: students.filter(s => s.status === 'inactive').length, icon: UserX, color: 'from-orange-500 to-red-500' },
-  ];
+  const handleWizardClose = () => {
+    setIsModalOpen(false);
+    setEditingStudent(null);
+    resetForm();
+  };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><div className="text-white/60">Loading students...</div></div>;
-  }
+  const filteredStudents = Array.isArray(students) ? students.filter(s => {
+    const term = searchTerm.toLowerCase();
+    if (searchType === 'name') return s.name?.toLowerCase().includes(term);
+    if (searchType === 'id') return s.admission_no?.toLowerCase().includes(term) || s.student_id?.toLowerCase().includes(term);
+    if (searchType === 'class') return s.class?.toLowerCase().includes(term);
+    if (searchType === 'section') return s.section?.toLowerCase().includes(term);
+    return true;
+  }) : [];
+
+  const stats = {
+    total: Array.isArray(students) ? students.length : 0,
+    active: Array.isArray(students) ? students.filter(s => s.status === 'Active').length : 0,
+    inactive: Array.isArray(students) ? students.filter(s => s.status === 'Inactive').length : 0,
+  };
 
   return (
-    <div>
-      <motion.div className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-          <BookOpen className="w-10 h-10 text-blue-400" />
-          Student Management
-        </h1>
-        <p className="text-white/60">Manage all students, track their progress, and update records</p>
-      </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+            <BookOpen className="w-8 h-8 text-blue-400" />
+            Student Management
+          </h1>
+          <p className="text-white/60">Manage all students, track their progress, and update records</p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {stats.map((stat, idx) => (
-          <div key={idx} className={`bg-gradient-to-r ${stat.color} rounded-2xl p-6 shadow-xl`}>
-            <div className="flex items-center justify-between">
-              <div><p className="text-white/80 text-sm">{stat.label}</p><p className="text-white text-4xl font-bold mt-2">{stat.value}</p></div>
-              <stat.icon className="w-12 h-12 text-white/30" />
-            </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6">
+            <p className="text-white/80 text-sm">Total Students</p>
+            <p className="text-white text-4xl font-bold">{stats.total}</p>
+            <p className="text-white/60 text-sm mt-2">Enrolled this year</p>
           </div>
-        ))}
-      </div>
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-6">
+            <p className="text-white/80 text-sm">Active Students</p>
+            <p className="text-white text-4xl font-bold">{stats.active}</p>
+            <p className="text-white/60 text-sm mt-2">Currently attending</p>
+          </div>
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6">
+            <p className="text-white/80 text-sm">Inactive Students</p>
+            <p className="text-white text-4xl font-bold">{stats.inactive}</p>
+            <p className="text-white/60 text-sm mt-2">Not currently enrolled</p>
+          </div>
+        </div>
 
-      <div className="flex gap-4 mb-8">
-        <button onClick={() => openModal('add')} className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold flex items-center gap-2">
-          <Plus size={20} /> Add Student
-        </button>
-        <button onClick={() => {
-          if (filteredStudents.length === 1) openModal('modify', filteredStudents[0]);
-          else if (filteredStudents.length > 0) {
-            const id = (prompt('Enter Student ID to modify:'));
-            const student = students.find(s => s.id === id);
+        {/* Buttons */}
+        <div className="flex flex-wrap gap-4 mb-6">
+          <button onClick={() => openModal('add')} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition">
+            <Plus size={18} /> Add Student
+          </button>
+          <button onClick={() => {
+            const id = prompt('Enter Admission Number or Student ID to modify:');
+            const student = students.find(s => s.admission_no === id || s.student_id === id || s.id === id);
             if (student) openModal('modify', student);
             else alert('Student not found!');
-          } else alert('No students available');
-        }} className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold flex items-center gap-2">
-          <Pencil size={20} /> Modify Student
-        </button>
-      </div>
+          }} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition">
+            <Pencil size={18} /> Modify Student
+          </button>
+        </div>
 
-      <div className="flex flex-wrap gap-4 mb-6">
+        {/* Search */}
+        <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex-1 min-w-[200px] relative">
             <input
               type="text"
@@ -258,11 +372,10 @@ export default function StudentsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40 pr-10"
             />
-            
           </div>
           <select
             value={searchType}
-            onChange={(e) => setSearchType(e.target.value as any)}
+            onChange={(e) => setSearchType(e.target.value)}
             className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-white/40"
           >
             <option value="name">Search by Name</option>
@@ -272,85 +385,101 @@ export default function StudentsPage() {
           </select>
         </div>
 
-      <div className="bg-white/5 backdrop-blur-xl rounded-2xl overflow-x-auto">
-        <table className="w-full min-w-[1600px]">
-          <thead className="bg-white/10">
-            <tr>
-              <th className="px-4 py-4 text-left text-white">ID</th>
-              <th className="px-4 py-4 text-left text-white">Admission No</th>
-              <th className="px-4 py-4 text-left text-white">Name</th>
-              <th className="px-4 py-4 text-left text-white">Class</th>
-              <th className="px-4 py-4 text-left text-white">Section</th>
-              <th className="px-4 py-4 text-left text-white">Roll No</th>
-              <th className="px-4 py-4 text-left text-white">Parent Name</th>
-              <th className="px-4 py-4 text-left text-white">Parent Phone</th>
-              <th className="px-4 py-4 text-left text-white">Parent Email</th>
-              <th className="px-4 py-4 text-left text-white">Student Contact</th>
-              <th className="px-4 py-4 text-left text-white">Student Email</th>
-              <th className="px-4 py-4 text-left text-white">Guardian Name</th>
-              <th className="px-4 py-4 text-left text-white">Guardian Phone</th>
-              <th className="px-4 py-4 text-left text-white">Status</th>
-              <th className="px-4 py-4 text-left text-white">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student) => (
-              <tr key={student.id} className="border-t border-white/10 hover:bg-white/5">
-                <td className="px-4 py-4 text-white/80">{student.id}</td>
-                <td className="px-4 py-4 text-white/80">{student.admissionNo || '—'}</td>
-                <td className="px-4 py-4 text-white font-medium">{student.name}</td>
-                <td className="px-4 py-4 text-white/80">{student.class || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.section || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.rollNo || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.parentName || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.parentPhone || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.parentEmail || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.contact || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.email || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.guardianName || '—'}</td>
-                <td className="px-4 py-4 text-white/80">{student.guardianPhone || '—'}</td>
-                <td className="px-4 py-4"><button onClick={() => handleToggleStatus(student.id)} className={`px-3 py-1 rounded-full text-sm font-semibold ${student.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{student.status}</button></td>
-                <td className="px-4 py-4"><div className="flex gap-2"><button onClick={() => openModal('modify', student)} className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg"><Pencil size={16} /></button><button onClick={() => handleDelete(student.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"><Trash2 size={16} /></button></div></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Table */}
+        <div className="bg-white/5 rounded-2xl overflow-hidden border border-white/10">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white/10">
+                <tr>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">ID</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Name</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Class</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Section</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Roll No</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Parent 1 Name</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Parent 1 Phone</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Parent 1 Email</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Parent 2 Name</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Parent 2 Phone</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Parent 2 Email</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Guardian Name</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Guardian Phone</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Guardian Email</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Status</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {loading ? (
+                  <tr>
+                    <td colSpan={16} className="text-center py-8 text-white/60">Loading...</td>
+                  </tr>
+                ) : filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={16} className="text-center py-8 text-white/60">
+                      {searchTerm ? 'No students match your search' : 'No students found'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStudents.map((student, idx) => {
+                    return (
+                      <tr key={student.id || idx} className="border-t border-white/10 hover:bg-white/5">
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.admission_no || student.student_id || student.id}</td>
+                        <td className="px-4 py-3 text-white text-sm font-medium">{student.name}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.class || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.section || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.roll_no || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_name || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_phone || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_email || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_name || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_phone || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_email || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_name || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_phone || '-'}</td>
+                        <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_email || '-'}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleToggleStatus(student)}
+                            className={`px-3 py-1 rounded-full text-sm font-semibold ${student.status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                          >
+                            {student.status === 'Active' ? '● Active' : '○ Inactive'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openModal('modify', student)}
+                              className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(student.admission_no || student.id)}
+                              className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <AnimatePresence>
-        {isModalOpen && (
-          <motion.div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
-            <motion.div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">{modalType === 'add' ? 'Add New Student' : 'Modify Student'}</h2>
-                <button onClick={() => setIsModalOpen(false)}><X size={24} className="text-white/40" /></button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" placeholder="Admission Number" value={formData.admissionNo} onChange={(e) => setFormData({...formData, admissionNo: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="text" placeholder="Student Name *" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="text" placeholder="Class" value={formData.class} onChange={(e) => setFormData({...formData, class: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="text" placeholder="Section" value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="text" placeholder="Roll Number" value={formData.rollNo} onChange={(e) => setFormData({...formData, rollNo: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="text" placeholder="Parent Name" value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="tel" placeholder="Parent Phone" value={formData.parentPhone} onChange={(e) => setFormData({...formData, parentPhone: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="email" placeholder="Parent Email (must end with @gmail.com)" value={formData.parentEmail} onChange={(e) => setFormData({...formData, parentEmail: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="tel" placeholder="Student Contact" value={formData.contact} onChange={(e) => setFormData({...formData, contact: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="email" placeholder="Student Email (must end with @gmail.com)" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="text" placeholder="Guardian Name" value={formData.guardianName} onChange={(e) => setFormData({...formData, guardianName: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-                <input type="tel" placeholder="Guardian Phone" value={formData.guardianPhone} onChange={(e) => setFormData({...formData, guardianPhone: e.target.value})} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white" />
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button onClick={modalType === 'add' ? handleAdd : handleModify} className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold">
-                  {modalType === 'add' ? 'Add Student' : 'Save Changes'}
-                </button>
-                <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-white/10 text-white rounded-xl font-semibold">Cancel</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 3-Step Wizard Modal */}
+      <StudentFormWizard
+        isOpen={isModalOpen}
+        onClose={handleWizardClose}
+        onSuccess={handleWizardSuccess}
+        editData={editingStudent}
+        theme="dark"
+      />
     </div>
   );
 }
