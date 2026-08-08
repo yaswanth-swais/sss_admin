@@ -6,7 +6,6 @@ import {
   Plus, Pencil, Trash2, Search, X,
   Users, UserCheck, UserX, BookOpen
 } from 'lucide-react';
-// Import the 3-step wizard
 import StudentFormWizard from '../../../components/StudentFormWizard';
 
 export default function StudentsPage() {
@@ -38,7 +37,6 @@ export default function StudentsPage() {
     status: 'Active'
   });
 
-  // State for wizard
   const [editingStudent, setEditingStudent] = useState(null);
 
   useEffect(() => {
@@ -291,7 +289,6 @@ export default function StudentsPage() {
     setIsModalOpen(true);
   };
 
-  // Wizard handlers
   const handleWizardSuccess = () => {
     fetchStudents();
   };
@@ -302,12 +299,18 @@ export default function StudentsPage() {
     resetForm();
   };
 
+  // Fix: Handle string/number conversion for search
   const filteredStudents = Array.isArray(students) ? students.filter(s => {
     const term = searchTerm.toLowerCase();
-    if (searchType === 'name') return s.name?.toLowerCase().includes(term);
-    if (searchType === 'id') return s.admission_no?.toLowerCase().includes(term) || s.student_id?.toLowerCase().includes(term);
-    if (searchType === 'class') return s.class?.toLowerCase().includes(term);
-    if (searchType === 'section') return s.section?.toLowerCase().includes(term);
+    const nameStr = s.name || s.full_name || '';
+    const idStr = s.admission_no ? String(s.admission_no) : '';
+    const classStr = s.class ? String(s.class) : '';
+    const sectionStr = s.section || '';
+    
+    if (searchType === 'name') return nameStr.toLowerCase().includes(term);
+    if (searchType === 'id') return idStr.toLowerCase().includes(term);
+    if (searchType === 'class') return classStr.toLowerCase().includes(term);
+    if (searchType === 'section') return sectionStr.toLowerCase().includes(term);
     return true;
   }) : [];
 
@@ -328,7 +331,6 @@ export default function StudentsPage() {
           <p className="text-white/60">Manage all students, track their progress, and update records</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6">
             <p className="text-white/80 text-sm">Total Students</p>
@@ -347,14 +349,13 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {/* Buttons */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button onClick={() => openModal('add')} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition">
             <Plus size={18} /> Add Student
           </button>
           <button onClick={() => {
             const id = prompt('Enter Admission Number or Student ID to modify:');
-            const student = students.find(s => s.admission_no === id || s.student_id === id || s.id === id);
+            const student = students.find(s => String(s.admission_no) === id || String(s.id) === id);
             if (student) openModal('modify', student);
             else alert('Student not found!');
           }} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition">
@@ -362,7 +363,6 @@ export default function StudentsPage() {
           </button>
         </div>
 
-        {/* Search */}
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex-1 min-w-[200px] relative">
             <input
@@ -370,7 +370,7 @@ export default function StudentsPage() {
               placeholder="Search by name, ID, class, or section..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40 pr-10"
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40"
             />
           </div>
           <select
@@ -385,7 +385,6 @@ export default function StudentsPage() {
           </select>
         </div>
 
-        {/* Table */}
         <div className="bg-white/5 rounded-2xl overflow-hidden border border-white/10">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -425,7 +424,7 @@ export default function StudentsPage() {
                     return (
                       <tr key={student.id || idx} className="border-t border-white/10 hover:bg-white/5">
                         <td className="px-4 py-3 text-white/80 text-sm">{student.admission_no || student.student_id || student.id}</td>
-                        <td className="px-4 py-3 text-white text-sm font-medium">{student.name}</td>
+                        <td className="px-4 py-3 text-white text-sm font-medium">{student.name || student.full_name}</td>
                         <td className="px-4 py-3 text-white/80 text-sm">{student.class || '-'}</td>
                         <td className="px-4 py-3 text-white/80 text-sm">{student.section || '-'}</td>
                         <td className="px-4 py-3 text-white/80 text-sm">{student.roll_no || '-'}</td>
@@ -472,7 +471,6 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      {/* 3-Step Wizard Modal */}
       <StudentFormWizard
         isOpen={isModalOpen}
         onClose={handleWizardClose}

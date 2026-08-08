@@ -212,11 +212,15 @@ export default function TeachersPage() {
     setIsModalOpen(true);
   };
 
+  // Fix: Convert id to string before calling toLowerCase
   const filteredTeachers = Array.isArray(teachers) ? teachers.filter(t => {
     const term = searchTerm.toLowerCase();
-    return t.name?.toLowerCase().includes(term) || 
-           t.id?.toLowerCase().includes(term) ||
-           t.subject?.toLowerCase().includes(term);
+    const idStr = t.id ? String(t.id) : '';
+    const nameStr = t.name || '';
+    const subjectStr = t.subject || '';
+    return nameStr.toLowerCase().includes(term) || 
+           idStr.toLowerCase().includes(term) ||
+           subjectStr.toLowerCase().includes(term);
   }) : [];
 
   const stats = {
@@ -262,7 +266,7 @@ export default function TeachersPage() {
           </button>
           <button onClick={() => {
             const id = prompt('Enter Teacher ID to modify:');
-            const teacher = teachers.find(t => t.id === id || t.teacher_id === id);
+            const teacher = teachers.find(t => String(t.id) === id || String(t.teacher_id) === id);
             if (teacher) openModal('modify', teacher);
             else alert('Teacher not found!');
           }} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition">
@@ -316,9 +320,9 @@ export default function TeachersPage() {
                   </tr>
                 ) : (
                   filteredTeachers.map((teacher, idx) => (
-                    <tr key={teacher.id || idx} className="border-t border-white/10 hover:bg-white/5">
-                      <td className="px-4 py-3 text-white/80 text-sm">{teacher.id || teacher.teacher_id}</td>
-                      <td className="px-4 py-3 text-white text-sm font-medium">{teacher.name || teacher.full_name}</td>
+                    <tr key={teacher.id || teacher.teacher_id || idx} className="border-t border-white/10 hover:bg-white/5">
+                      <td className="px-4 py-3 text-white/80 text-sm">{teacher.id || teacher.teacher_id || '-'}</td>
+                      <td className="px-4 py-3 text-white text-sm font-medium">{teacher.name || teacher.full_name || '-'}</td>
                       <td className="px-4 py-3 text-white/80 text-sm">{teacher.subject || teacher.subject_name || '-'}</td>
                       <td className="px-4 py-3 text-white/80 text-sm">{teacher.qualification || '-'}</td>
                       <td className="px-4 py-3 text-white/80 text-sm">{teacher.class_id || '-'}</td>
