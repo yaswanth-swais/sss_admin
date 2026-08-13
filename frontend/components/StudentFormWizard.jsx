@@ -94,6 +94,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       setClassInput('');
       setStep(1);
       setErrors({});
+      generateStudentId();
     }
   }, [isOpen, editData]);
 
@@ -122,72 +123,16 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
     }
   }, [editData]);
 
-  useEffect(() => {
-    if (isOpen && !editData) {
-      generateStudentId();
-    }
-  }, [isOpen, editData]);
-
   const generateStudentId = async () => {
     try {
+      console.log('🔍 Generating student ID...');
       const response = await fetch('/api/generate-id?type=student');
       const data = await response.json();
       if (data.id) {
         setFormData(prev => ({ ...prev, admission_no: data.id }));
       }
     } catch (error) {
-      console.error('Error generating ID:', error);
-    }
-  };
-
-  // Prevent Enter key from submitting the form
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (step === 1 || step === 2) {
-        return;
-      }
-      if (step === 3) {
-        return;
-      }
-    }
-  };
-
-  const handleClassChange = (e) => {
-    const value = e.target.value;
-    setClassInput(value);
-    setShowClassDropdown(true);
-    
-    const lowerValue = value.toLowerCase().trim();
-    let classId = '';
-    
-    if (wordToNumber[lowerValue]) {
-      classId = wordToNumber[lowerValue].toString();
-    } else if (!isNaN(value) && value >= 1 && value <= 12) {
-      classId = value;
-    } else {
-      const matchedClass = availableClasses.find(c => 
-        c.class_name?.toLowerCase() === lowerValue ||
-        numberToWord[c.class_id]?.toLowerCase() === lowerValue
-      );
-      if (matchedClass) {
-        classId = matchedClass.class_id.toString();
-      }
-    }
-    
-    setFormData(prev => ({ ...prev, class_id: classId }));
-    if (errors.class_id) {
-      setErrors(prev => ({ ...prev, class_id: '' }));
-    }
-  };
-
-  const handleClassSelect = (classId) => {
-    const selectedClass = availableClasses.find(c => c.class_id === classId);
-    setClassInput(selectedClass?.class_name || classId.toString());
-    setFormData(prev => ({ ...prev, class_id: classId.toString() }));
-    setShowClassDropdown(false);
-    if (errors.class_id) {
-      setErrors(prev => ({ ...prev, class_id: '' }));
+      console.error('❌ Error generating ID:', error);
     }
   };
 
@@ -230,6 +175,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       if (formData.parent1_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parent1_email)) {
         newErrors.parent1_email = 'Invalid email format';
       }
+      // Parent 2 is optional, but validate email if provided
       if (formData.parent2_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parent2_email)) {
         newErrors.parent2_email = 'Invalid email format';
       }
@@ -304,10 +250,27 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
         }
       }
       
+      // Create payload with all fields including Parent 2
       const payload = {
-        ...formData,
-        class_id: classIdValue ? parseInt(classIdValue) : null
+        admission_no: formData.admission_no,
+        full_name: formData.full_name,
+        class_id: classIdValue ? parseInt(classIdValue) : null,
+        section: formData.section,
+        roll_no: formData.roll_no || null,
+        parent1_name: formData.parent1_name,
+        parent1_phone: formData.parent1_phone || null,
+        parent1_email: formData.parent1_email || null,
+        parent2_name: formData.parent2_name || null,
+        parent2_phone: formData.parent2_phone || null,
+        parent2_email: formData.parent2_email || null,
+        student_phone: formData.student_phone || null,
+        student_email: formData.student_email || null,
+        guardian_name: formData.guardian_name || null,
+        guardian_phone: formData.guardian_phone || null,
+        guardian_email: formData.guardian_email || null
       };
+      
+      console.log('📝 Sending payload:', payload);
       
       const response = await fetch(url, {
         method: method,
@@ -317,6 +280,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       const data = await response.json();
       if (response.ok) {
         onSuccess();
+        // Reset form
         setFormData({
           admission_no: '',
           full_name: '',
@@ -472,7 +436,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="admission_no"
                         value={formData.admission_no}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.admission_no ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="e.g., S001"
                         readOnly
@@ -489,7 +452,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="full_name"
                         value={formData.full_name}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.full_name ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="Enter student name"
                       />
@@ -502,22 +464,51 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                       <input
                         type="text"
                         value={classInput}
-                        onChange={handleClassChange}
-                        onKeyDown={handleKeyDown}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setClassInput(value);
+                          setShowClassDropdown(true);
+                          const lowerValue = value.toLowerCase().trim();
+                          let classId = '';
+                          if (wordToNumber[lowerValue]) {
+                            classId = wordToNumber[lowerValue].toString();
+                          } else if (!isNaN(value) && value >= 1 && value <= 12) {
+                            classId = value;
+                          } else {
+                            const matchedClass = availableClasses.find(c => 
+                              c.class_name?.toLowerCase() === lowerValue ||
+                              numberToWord[c.class_id]?.toLowerCase() === lowerValue
+                            );
+                            if (matchedClass) {
+                              classId = matchedClass.class_id.toString();
+                            }
+                          }
+                          setFormData(prev => ({ ...prev, class_id: classId }));
+                          if (errors.class_id) {
+                            setErrors(prev => ({ ...prev, class_id: '' }));
+                          }
+                        }}
                         onFocus={() => setShowClassDropdown(true)}
                         onBlur={() => setTimeout(() => setShowClassDropdown(false), 200)}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.class_id ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="e.g., 1, 5, First, Tenth"
                       />
                       {errors.class_id && <p className="mt-1 text-xs text-red-500">{errors.class_id}</p>}
-                      
                       {showClassDropdown && suggestions.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-white/20 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                           {suggestions.map((sug) => (
                             <button
                               key={sug.id}
                               type="button"
-                              onClick={() => handleClassSelect(sug.id)}
+                              onClick={() => {
+                                const selectedClass = availableClasses.find(c => c.class_id === sug.id);
+                                setClassInput(selectedClass?.class_name || sug.id.toString());
+                                setFormData(prev => ({ ...prev, class_id: sug.id.toString() }));
+                                setShowClassDropdown(false);
+                                if (errors.class_id) {
+                                  setErrors(prev => ({ ...prev, class_id: '' }));
+                                }
+                              }}
                               className="w-full text-left px-4 py-2 text-white hover:bg-white/10 transition-colors"
                             >
                               {sug.label}
@@ -535,7 +526,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="section"
                         value={formData.section}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.section ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="e.g., A"
                       />
@@ -550,7 +540,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="roll_no"
                         value={formData.roll_no}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="e.g., 01"
                       />
@@ -564,7 +553,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="student_phone"
                         value={formData.student_phone}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="e.g., 9876543210"
                       />
@@ -578,7 +566,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="student_email"
                         value={formData.student_email}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="student@email.com"
                       />
@@ -613,7 +600,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                           name="parent1_name"
                           value={formData.parent1_name}
                           onChange={handleChange}
-                          onKeyDown={handleKeyDown}
                           className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.parent1_name ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                           placeholder="Enter parent 1 name"
                         />
@@ -628,7 +614,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                           name="parent1_phone"
                           value={formData.parent1_phone}
                           onChange={handleChange}
-                          onKeyDown={handleKeyDown}
                           className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.parent1_phone ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                           placeholder="e.g., 9876543210"
                         />
@@ -643,7 +628,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                           name="parent1_email"
                           value={formData.parent1_email}
                           onChange={handleChange}
-                          onKeyDown={handleKeyDown}
                           className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.parent1_email ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                           placeholder="parent1@email.com"
                         />
@@ -666,7 +650,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                           name="parent2_name"
                           value={formData.parent2_name}
                           onChange={handleChange}
-                          onKeyDown={handleKeyDown}
                           className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                           placeholder="Enter parent 2 name"
                         />
@@ -680,7 +663,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                           name="parent2_phone"
                           value={formData.parent2_phone}
                           onChange={handleChange}
-                          onKeyDown={handleKeyDown}
                           className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                           placeholder="e.g., 9876543210"
                         />
@@ -694,7 +676,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                           name="parent2_email"
                           value={formData.parent2_email}
                           onChange={handleChange}
-                          onKeyDown={handleKeyDown}
                           className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.parent2_email ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                           placeholder="parent2@email.com"
                         />
@@ -726,7 +707,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="guardian_name"
                         value={formData.guardian_name}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="Enter guardian name"
                       />
@@ -740,7 +720,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="guardian_phone"
                         value={formData.guardian_phone}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="e.g., 9876543210"
                       />
@@ -754,7 +733,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
                         name="guardian_email"
                         value={formData.guardian_email}
                         onChange={handleChange}
-                        onKeyDown={handleKeyDown}
                         className={`w-full px-3 py-2 mt-1 ${inputBg} border ${errors.guardian_email ? 'border-red-500' : inputBorder} rounded-lg ${inputText} ${placeholderColor} focus:outline-none focus:border-blue-500`}
                         placeholder="guardian@email.com"
                       />

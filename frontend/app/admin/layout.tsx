@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
   BookOpen,
   Settings,
   Menu,
+  X,  
   LogOut
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function AdminLayout({
   children,
@@ -19,6 +21,7 @@ export default function AdminLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout from this page?')) {

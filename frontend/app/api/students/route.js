@@ -8,81 +8,122 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 });
+
+// Helper to get existing columns
+async function getExistingColumns(tableName) {
+  try {
+    const result = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = $1
+      ORDER BY ordinal_position
+    `, [tableName]);
+    return result.rows.map(r => r.column_name);
+  } catch (error) {
+    console.error('Error getting columns:', error);
+    return [];
+  }
+}
+
+// Helper to find a column that exists
+function findColumn(possibleColumns, existingColumns) {
+  for (const col of possibleColumns) {
+    if (existingColumns.includes(col)) {
+      return col;
+    }
+  }
+  return null;
+}
+
+// Detect which table to use (sss_ or sgs_)
+async function getTableName() {
+  // Check if sss_student_master exists
+  const sssCheck = await pool.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_name = 'sss_student_master'
+    )
+  `);
+  
+  if (sssCheck.rows[0].exists) {
+    console.log('📋 Using sss_student_master table');
+    return 'sss_student_master';
+  }
+  
+  // Fallback to sgs_student_master
+  const sgsCheck = await pool.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_name = 'sgs_student_master'
+    )
+  `);
+  
+  if (sgsCheck.rows[0].exists) {
+    console.log('📋 Using sgs_student_master table');
+    return 'sgs_student_master';
+  }
+  
+  return null;
+}
 
 export async function GET() {
   try {
-    console.log('🔍 Fetching students from SSS...');
+    console.log('🔍 Fetching students...');
     
-    // Check if sss_student_master exists
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'sss_student_master'
-      )
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
-      console.log('❌ sss_student_master table not found');
+    const tableName = await getTableName();
+    if (!tableName) {
+      console.log('❌ No student table found');
       return NextResponse.json([], { status: 200 });
     }
     
-    // Get column names
-    const columnsResult = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'sss_student_master'
-      ORDER BY ordinal_position
-    `);
-    
-    const existingColumns = columnsResult.rows.map(r => r.column_name);
+    const existingColumns = await getExistingColumns(tableName);
     console.log('📋 Available columns:', existingColumns);
 
-    // Build query based on existing columns
-    let selectFields = [];
-    
-    // Map SSS columns to frontend expected fields
+    // Map frontend fields to database columns (support both SSS and SGS naming)
     const columnMap = {
       'admission_no': ['admission_no', 'student_id'],
-      'full_name': ['name', 'full_name', 'student_name'],
+      'full_name': ['full_name', 'name', 'student_name'],
       'class_id': ['class_id'],
+      'class_name': ['class_name'],
       'section': ['section'],
-      'roll_no': ['roll_number', 'roll_no'],
-      'parent1_name': ['parent_name', 'parent1_name'],
-      'parent1_phone': ['parent_phone', 'parent1_phone'],
-      'parent1_email': ['parent_email', 'parent1_email'],
-      'student_phone': ['student_phone'],
+      'roll_no': ['roll_no', 'roll_number'],
+      'parent1_name': ['parent1_name', 'parent_name', 'father_name'],
+      'parent1_phone': ['parent1_phone', 'parent_phone', 'mobile_no'],
+      'parent1_email': ['parent1_email', 'parent_email'],
+      'parent2_name': ['parent2_name', 'mother_name'],
+      'parent2_phone': ['parent2_phone'],
+      'parent2_email': ['parent2_email'],
+      'student_phone': ['student_phone', 'student_contact'],
       'student_email': ['student_email'],
       'guardian_name': ['guardian_name'],
       'guardian_phone': ['guardian_phone'],
       'guardian_email': ['guardian_email'],
-      'record_status': ['record_status', 'status']
+      'record_status': ['record_status', 'status', 'is_active']
     };
 
+    let selectFields = [];
     for (const [asField, possibleColumns] of Object.entries(columnMap)) {
-      for (const col of possibleColumns) {
-        if (existingColumns.includes(col)) {
-          selectFields.push(`${col} as ${asField}`);
-          break;
-        }
+      const found = findColumn(possibleColumns, existingColumns);
+      if (found) {
+        selectFields.push(`${found} as ${asField}`);
       }
     }
 
     let query;
     if (selectFields.length === 0) {
-      query = `SELECT * FROM sss_student_master`;
+      query = `SELECT * FROM ${tableName}`;
     } else {
-      query = `SELECT ${selectFields.join(', ')} FROM sss_student_master`;
-      if (existingColumns.includes('record_status')) {
-        query += ` WHERE record_status = 'Active'`;
-      } else if (existingColumns.includes('status')) {
-        query += ` WHERE status = 'Active'`;
+      query = `SELECT ${selectFields.join(', ')} FROM ${tableName}`;
+      const statusCol = findColumn(['record_status', 'status', 'is_active'], existingColumns);
+      if (statusCol) {
+        query += ` WHERE ${statusCol} = 'Active' OR ${statusCol} = true`;
       }
-      if (existingColumns.includes('admission_no')) {
-        query += ' ORDER BY admission_no';
-      } else if (existingColumns.includes('student_id')) {
-        query += ' ORDER BY student_id';
+      const idCol = findColumn(['admission_no', 'student_id'], existingColumns);
+      if (idCol) {
+        query += ` ORDER BY ${idCol}`;
       }
     }
 
@@ -101,41 +142,31 @@ export async function POST(request) {
     const body = await request.json();
     console.log('📝 Received student data:', body);
 
-    // Check if table exists
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'sss_student_master'
-      )
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
+    const tableName = await getTableName();
+    if (!tableName) {
       return NextResponse.json({
-        error: 'sss_student_master table not found'
+        error: 'Student table not found'
       }, { status: 500 });
     }
 
-    // Get column names
-    const columnsResult = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'sss_student_master'
-      ORDER BY ordinal_position
-    `);
-    
-    const existingColumns = columnsResult.rows.map(r => r.column_name);
+    const existingColumns = await getExistingColumns(tableName);
+    console.log('📋 Available columns for INSERT:', existingColumns);
 
     // Map frontend fields to database columns
     const fieldMap = {
       'admission_no': ['admission_no', 'student_id'],
-      'full_name': ['name', 'full_name', 'student_name'],
+      'full_name': ['full_name', 'name', 'student_name'],
       'class_id': ['class_id'],
+      'class_name': ['class_name'],
       'section': ['section'],
-      'roll_no': ['roll_number', 'roll_no'],
-      'parent1_name': ['parent_name', 'parent1_name'],
-      'parent1_phone': ['parent_phone', 'parent1_phone'],
-      'parent1_email': ['parent_email', 'parent1_email'],
-      'student_phone': ['student_phone'],
+      'roll_no': ['roll_no', 'roll_number'],
+      'parent1_name': ['parent1_name', 'parent_name', 'father_name'],
+      'parent1_phone': ['parent1_phone', 'parent_phone', 'mobile_no'],
+      'parent1_email': ['parent1_email', 'parent_email'],
+      'parent2_name': ['parent2_name', 'mother_name'],
+      'parent2_phone': ['parent2_phone'],
+      'parent2_email': ['parent2_email'],
+      'student_phone': ['student_phone', 'student_contact'],
       'student_email': ['student_email'],
       'guardian_name': ['guardian_name'],
       'guardian_phone': ['guardian_phone'],
@@ -145,11 +176,12 @@ export async function POST(request) {
     const insertColumns = [];
     const values = [];
 
-    for (const [frontendKey, dbAlternatives] of Object.entries(fieldMap)) {
-      const foundColumn = dbAlternatives.find(alt => existingColumns.includes(alt));
-      if (foundColumn) {
-        insertColumns.push(foundColumn);
+    for (const [frontendKey, possibleColumns] of Object.entries(fieldMap)) {
+      const found = findColumn(possibleColumns, existingColumns);
+      if (found) {
+        insertColumns.push(found);
         let value = body[frontendKey] || null;
+        // Handle special cases
         if (frontendKey === 'class_id' && value) {
           value = parseInt(value) || null;
         }
@@ -157,23 +189,43 @@ export async function POST(request) {
       }
     }
 
-    if (existingColumns.includes('record_status')) {
-      insertColumns.push('record_status');
+    // Add status column
+    const statusCol = findColumn(['record_status', 'status', 'is_active'], existingColumns);
+    if (statusCol) {
+      insertColumns.push(statusCol);
       values.push('Active');
     }
 
     if (insertColumns.length === 0) {
       return NextResponse.json({
-        error: 'No matching columns found'
+        error: 'No matching columns found in the database table'
       }, { status: 400 });
     }
 
     const columnNames = insertColumns.join(', ');
     const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-    const query = `INSERT INTO sss_student_master (${columnNames}) VALUES (${placeholders}) RETURNING *`;
+    const query = `INSERT INTO ${tableName} (${columnNames}) VALUES (${placeholders}) RETURNING *`;
 
     console.log('📝 Insert query:', query);
+    console.log('📊 Values:', values);
+
+    // Check for duplicate admission number
+    const idCol = findColumn(['admission_no', 'student_id'], existingColumns);
+    if (idCol && body.admission_no) {
+      const checkDuplicate = await pool.query(
+        `SELECT ${idCol} FROM ${tableName} WHERE ${idCol} = $1`,
+        [body.admission_no]
+      );
+      if (checkDuplicate.rows.length > 0) {
+        return NextResponse.json(
+          { error: `Student ID ${body.admission_no} already exists` },
+          { status: 400 }
+        );
+      }
+    }
+
     const result = await pool.query(query, values);
+    console.log('✅ Student added successfully:', result.rows[0]);
 
     return NextResponse.json({
       success: true,
@@ -182,7 +234,8 @@ export async function POST(request) {
   } catch (error) {
     console.error('❌ Error adding student:', error);
     return NextResponse.json({
-      error: error.message
+      error: error.message,
+      details: error.stack
     }, { status: 500 });
   }
 }
@@ -190,33 +243,54 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const admissionNo = body.admission_no;
+    console.log('📝 Updating student:', body);
+
+    const tableName = await getTableName();
+    if (!tableName) {
+      return NextResponse.json({
+        error: 'Student table not found'
+      }, { status: 500 });
+    }
+
+    const existingColumns = await getExistingColumns(tableName);
     
-    if (!admissionNo) {
+    const idCol = findColumn(['admission_no', 'student_id'], existingColumns);
+    const studentId = body.admission_no || body.student_id || body.id;
+    
+    if (!studentId || !idCol) {
       return NextResponse.json(
         { error: 'Student ID is required' },
         { status: 400 }
       );
     }
 
-    const columnsResult = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'sss_student_master'
-      ORDER BY ordinal_position
-    `);
-    
-    const existingColumns = columnsResult.rows.map(r => r.column_name);
+    // Check if student exists
+    const checkExists = await pool.query(
+      `SELECT ${idCol} FROM ${tableName} WHERE ${idCol} = $1`,
+      [studentId]
+    );
 
+    if (checkExists.rows.length === 0) {
+      return NextResponse.json(
+        { error: `Student with ID ${studentId} not found` },
+        { status: 404 }
+      );
+    }
+
+    // Map frontend fields to database columns for UPDATE
     const fieldMap = {
-      'full_name': ['name', 'full_name', 'student_name'],
+      'full_name': ['full_name', 'name', 'student_name'],
       'class_id': ['class_id'],
+      'class_name': ['class_name'],
       'section': ['section'],
-      'roll_no': ['roll_number', 'roll_no'],
-      'parent1_name': ['parent_name', 'parent1_name'],
-      'parent1_phone': ['parent_phone', 'parent1_phone'],
-      'parent1_email': ['parent_email', 'parent1_email'],
-      'student_phone': ['student_phone'],
+      'roll_no': ['roll_no', 'roll_number'],
+      'parent1_name': ['parent1_name', 'parent_name', 'father_name'],
+      'parent1_phone': ['parent1_phone', 'parent_phone', 'mobile_no'],
+      'parent1_email': ['parent1_email', 'parent_email'],
+      'parent2_name': ['parent2_name', 'mother_name'],
+      'parent2_phone': ['parent2_phone'],
+      'parent2_email': ['parent2_email'],
+      'student_phone': ['student_phone', 'student_contact'],
       'student_email': ['student_email'],
       'guardian_name': ['guardian_name'],
       'guardian_phone': ['guardian_phone'],
@@ -227,14 +301,14 @@ export async function PUT(request) {
     const values = [];
     let paramCounter = 1;
 
-    for (const [frontendKey, dbAlternatives] of Object.entries(fieldMap)) {
-      const foundColumn = dbAlternatives.find(alt => existingColumns.includes(alt));
-      if (foundColumn && body[frontendKey] !== undefined) {
+    for (const [frontendKey, possibleColumns] of Object.entries(fieldMap)) {
+      const found = findColumn(possibleColumns, existingColumns);
+      if (found && body[frontendKey] !== undefined) {
         let value = body[frontendKey];
         if (frontendKey === 'class_id' && value) {
           value = parseInt(value) || null;
         }
-        setClauses.push(`${foundColumn} = $${paramCounter}`);
+        setClauses.push(`${found} = $${paramCounter}`);
         values.push(value);
         paramCounter++;
       }
@@ -247,25 +321,32 @@ export async function PUT(request) {
       );
     }
 
-    values.push(admissionNo);
-    const query = `UPDATE sss_student_master SET ${setClauses.join(', ')} WHERE admission_no = $${paramCounter} RETURNING *`;
+    values.push(studentId);
+    const query = `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE ${idCol} = $${paramCounter} RETURNING *`;
+
+    console.log('📝 Update query:', query);
+    console.log('📊 Values:', values);
 
     const result = await pool.query(query, values);
+
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: `Student with ID ${admissionNo} not found` },
+        { error: `Student with ID ${studentId} not found` },
         { status: 404 }
       );
     }
 
+    console.log('✅ Student updated successfully:', result.rows[0]);
+
     return NextResponse.json({
       success: true,
-      message: 'Student updated successfully'
+      student: result.rows[0]
     });
   } catch (error) {
     console.error('❌ Error updating student:', error);
     return NextResponse.json({
-      error: error.message
+      error: error.message,
+      details: error.stack
     }, { status: 500 });
   }
 }
@@ -282,21 +363,29 @@ export async function DELETE(request) {
       );
     }
 
-    const columnsResult = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'sss_student_master'
-    `);
-    const existingColumns = columnsResult.rows.map(r => r.column_name);
-
-    let query;
-    if (existingColumns.includes('record_status')) {
-      query = `UPDATE sss_student_master SET record_status = 'Deleted' WHERE admission_no = $1 RETURNING *`;
-    } else {
-      query = `DELETE FROM sss_student_master WHERE admission_no = $1 RETURNING *`;
+    const tableName = await getTableName();
+    if (!tableName) {
+      return NextResponse.json({
+        error: 'Student table not found'
+      }, { status: 500 });
     }
 
-    const result = await pool.query(query, [id]);
+    const existingColumns = await getExistingColumns(tableName);
+    const idCol = findColumn(['admission_no', 'student_id'], existingColumns);
+    const statusCol = findColumn(['record_status', 'status', 'is_active'], existingColumns);
+
+    if (!idCol || !statusCol) {
+      return NextResponse.json(
+        { error: 'Required columns not found' },
+        { status: 500 }
+      );
+    }
+
+    const result = await pool.query(
+      `UPDATE ${tableName} SET ${statusCol} = 'Deleted' WHERE ${idCol} = $1 RETURNING *`,
+      [id]
+    );
+
     if (result.rows.length === 0) {
       return NextResponse.json(
         { error: `Student with ID ${id} not found` },
