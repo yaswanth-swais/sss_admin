@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function TeachersPage() {
   const fetchTeachers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/teachers');
+      const response = await fetch(`${API_BASE_URL}/teachers`);
       const data = await response.json();
       if (Array.isArray(data)) {
         setTeachers(data);
@@ -81,7 +83,7 @@ export default function TeachersPage() {
   const handleAdd = async () => {
     if (!validateForm()) return;
     try {
-      const response = await fetch('/api/teachers', {
+      const response = await fetch(`${API_BASE_URL}/teachers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +120,7 @@ export default function TeachersPage() {
     if (!validateForm()) return;
     if (selectedTeacher) {
       try {
-        const response = await fetch('/api/teachers', {
+        const response = await fetch(`${API_BASE_URL}/teachers`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -155,7 +157,7 @@ export default function TeachersPage() {
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this teacher?')) {
       try {
-        await fetch(`/api/teachers?id=${id}`, { method: 'DELETE' });
+        await fetch(`${API_BASE_URL}/teachers?id=${id}`, { method: 'DELETE' });
         fetchTeachers();
       } catch (error) {
         console.error('Error deleting teacher:', error);

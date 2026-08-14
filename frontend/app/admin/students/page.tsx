@@ -6,7 +6,9 @@ import {
   Plus, Pencil, Trash2, Search, X,
   Users, UserCheck, UserX, BookOpen
 } from 'lucide-react';
-import StudentFormWizard from '../../../components/StudentFormWizard';
+import StudentFormWizard from '../../components/StudentFormWizard';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -46,7 +48,7 @@ export default function StudentsPage() {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/students');
+      const response = await fetch(`${API_BASE_URL}/students`);
       const data = await response.json();
       console.log('API Response:', data);
       
@@ -76,7 +78,6 @@ export default function StudentsPage() {
           status: s.record_status === 'Active' ? 'Active' : (s.status || 'Active'),
           record_status: s.record_status || 'Active'
         }));
-        console.log('Mapped Students:', mappedStudents);
         setStudents(mappedStudents);
       } else {
         console.error('Expected array but got:', data);
@@ -87,149 +88,6 @@ export default function StudentsPage() {
       setStudents([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const validateForm = () => {
-    const admissionNo = formData.admission_no.trim();
-    if (!admissionNo) {
-      setValidationError('Admission Number is required');
-      return false;
-    }
-    if (!admissionNo.match(/^S/)) {
-      setValidationError('Admission Number must start with "S" (Student)');
-      return false;
-    }
-    if (!formData.name.trim()) {
-      setValidationError('Student Name is required');
-      return false;
-    }
-    if (formData.parent1_email && !formData.parent1_email.includes('@')) {
-      setValidationError('Please enter a valid parent1 email address');
-      return false;
-    }
-    if (formData.parent2_email && !formData.parent2_email.includes('@')) {
-      setValidationError('Please enter a valid parent2 email address');
-      return false;
-    }
-    if (formData.student_email && !formData.student_email.includes('@')) {
-      setValidationError('Please enter a valid student email address');
-      return false;
-    }
-    if (formData.guardian_email && !formData.guardian_email.includes('@')) {
-      setValidationError('Please enter a valid guardian email address');
-      return false;
-    }
-    setValidationError('');
-    return true;
-  };
-
-  const handleAdd = async () => {
-    if (!validateForm()) return;
-    try {
-      const response = await fetch('/api/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admission_no: formData.admission_no,
-          full_name: formData.name,
-          class_id: formData.class,
-          section: formData.section,
-          roll_no: formData.roll_no,
-          parent1_name: formData.parent1_name,
-          parent1_phone: formData.parent1_phone,
-          parent1_email: formData.parent1_email,
-          parent2_name: formData.parent2_name,
-          parent2_phone: formData.parent2_phone,
-          parent2_email: formData.parent2_email,
-          student_phone: formData.student_contact,
-          student_email: formData.student_email,
-          guardian_name: formData.guardian_name,
-          guardian_phone: formData.guardian_phone,
-          guardian_email: formData.guardian_email
-        })
-      });
-      if (response.ok) {
-        fetchStudents();
-        setIsModalOpen(false);
-        resetForm();
-      } else {
-        const error = await response.json();
-        setValidationError(error.error || 'Failed to add student');
-      }
-    } catch (error) {
-      console.error('Error adding student:', error);
-      setValidationError('Failed to add student');
-    }
-  };
-
-  const handleModify = async () => {
-    if (!validateForm()) return;
-    if (selectedStudent) {
-      try {
-        const response = await fetch('/api/students', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            admission_no: formData.admission_no,
-            full_name: formData.name,
-            class_id: formData.class,
-            section: formData.section,
-            roll_no: formData.roll_no,
-            parent1_name: formData.parent1_name,
-            parent1_phone: formData.parent1_phone,
-            parent1_email: formData.parent1_email,
-            parent2_name: formData.parent2_name,
-            parent2_phone: formData.parent2_phone,
-            parent2_email: formData.parent2_email,
-            student_phone: formData.student_contact,
-            student_email: formData.student_email,
-            guardian_name: formData.guardian_name,
-            guardian_phone: formData.guardian_phone,
-            guardian_email: formData.guardian_email,
-            id: selectedStudent.id
-          })
-        });
-        if (response.ok) {
-          fetchStudents();
-          setIsModalOpen(false);
-          resetForm();
-        } else {
-          const error = await response.json();
-          setValidationError(error.error || 'Failed to update student');
-        }
-      } catch (error) {
-        console.error('Error updating student:', error);
-        setValidationError('Failed to update student');
-      }
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (confirm('Are you sure you want to delete this student?')) {
-      try {
-        await fetch(`/api/students?id=${id}`, { method: 'DELETE' });
-        fetchStudents();
-      } catch (error) {
-        console.error('Error deleting student:', error);
-      }
-    }
-  };
-
-  const handleToggleStatus = async (student) => {
-    const newStatus = student.status === 'Active' ? 'Inactive' : 'Active';
-    try {
-      await fetch('/api/students', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          admission_no: student.admission_no,
-          status: newStatus 
-        })
-      });
-      fetchStudents();
-    } catch (error) {
-      console.error('Error updating status:', error);
     }
   };
 
@@ -299,18 +157,12 @@ export default function StudentsPage() {
     resetForm();
   };
 
-  // Fix: Handle string/number conversion for search
   const filteredStudents = Array.isArray(students) ? students.filter(s => {
     const term = searchTerm.toLowerCase();
-    const nameStr = s.name || s.full_name || '';
-    const idStr = s.admission_no ? String(s.admission_no) : '';
-    const classStr = s.class ? String(s.class) : '';
-    const sectionStr = s.section || '';
-    
-    if (searchType === 'name') return nameStr.toLowerCase().includes(term);
-    if (searchType === 'id') return idStr.toLowerCase().includes(term);
-    if (searchType === 'class') return classStr.toLowerCase().includes(term);
-    if (searchType === 'section') return sectionStr.toLowerCase().includes(term);
+    if (searchType === 'name') return s.name?.toLowerCase().includes(term);
+    if (searchType === 'id') return s.admission_no?.toLowerCase().includes(term) || s.student_id?.toLowerCase().includes(term);
+    if (searchType === 'class') return String(s.class).toLowerCase().includes(term);
+    if (searchType === 'section') return s.section?.toLowerCase().includes(term);
     return true;
   }) : [];
 
@@ -355,7 +207,7 @@ export default function StudentsPage() {
           </button>
           <button onClick={() => {
             const id = prompt('Enter Admission Number or Student ID to modify:');
-            const student = students.find(s => String(s.admission_no) === id || String(s.id) === id);
+            const student = students.find(s => s.admission_no === id || s.student_id === id || s.id === id);
             if (student) openModal('modify', student);
             else alert('Student not found!');
           }} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition">
@@ -420,50 +272,64 @@ export default function StudentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((student, idx) => {
-                    return (
-                      <tr key={student.id || idx} className="border-t border-white/10 hover:bg-white/5">
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.admission_no || student.student_id || student.id}</td>
-                        <td className="px-4 py-3 text-white text-sm font-medium">{student.name || student.full_name}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.class || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.section || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.roll_no || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_name || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_phone || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_email || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_name || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_phone || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_email || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_name || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_phone || '-'}</td>
-                        <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_email || '-'}</td>
-                        <td className="px-4 py-3">
+                  filteredStudents.map((student, idx) => (
+                    <tr key={student.id || idx} className="border-t border-white/10 hover:bg-white/5">
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.admission_no || student.student_id || student.id}</td>
+                      <td className="px-4 py-3 text-white text-sm font-medium">{student.name || student.full_name}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.class || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.section || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.roll_no || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_name || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_phone || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.parent1_email || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_name || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_phone || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.parent2_email || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_name || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_phone || '-'}</td>
+                      <td className="px-4 py-3 text-white/80 text-sm">{student.guardian_email || '-'}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => {
+                            const newStatus = student.status === 'Active' ? 'Inactive' : 'Active';
+                            fetch(`${API_BASE_URL}/students`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ ...student, status: newStatus })
+                            }).then(() => fetchStudents());
+                          }}
+                          className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            student.status === 'Active' 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : 'bg-red-500/20 text-red-400'
+                          }`}
+                        >
+                          {student.status === 'Active' ? '● Active' : '○ Inactive'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => handleToggleStatus(student)}
-                            className={`px-3 py-1 rounded-full text-sm font-semibold ${student.status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                            onClick={() => openModal('modify', student)}
+                            className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition"
                           >
-                            {student.status === 'Active' ? '● Active' : '○ Inactive'}
+                            <Pencil size={16} />
                           </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => openModal('modify', student)}
-                              className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(student.admission_no || student.id)}
-                              className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+                          <button
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this student?')) {
+                                fetch(`${API_BASE_URL}/students?id=${student.admission_no}`, { method: 'DELETE' })
+                                  .then(() => fetchStudents());
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

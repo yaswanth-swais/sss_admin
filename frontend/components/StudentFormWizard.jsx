@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 
+// Get the API base URL from environment
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
 const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark' }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -60,7 +63,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
 
   const fetchAvailableClasses = async () => {
     try {
-      const response = await fetch('/api/classes');
+      const response = await fetch(`${API_BASE_URL}/classes`);
       if (response.ok) {
         const data = await response.json();
         setAvailableClasses(data);
@@ -126,7 +129,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
   const generateStudentId = async () => {
     try {
       console.log('🔍 Generating student ID...');
-      const response = await fetch('/api/generate-id?type=student');
+      const response = await fetch(`${API_BASE_URL}/generate-id?type=student`);
       const data = await response.json();
       if (data.id) {
         setFormData(prev => ({ ...prev, admission_no: data.id }));
@@ -175,7 +178,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       if (formData.parent1_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parent1_email)) {
         newErrors.parent1_email = 'Invalid email format';
       }
-      // Parent 2 is optional, but validate email if provided
       if (formData.parent2_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parent2_email)) {
         newErrors.parent2_email = 'Invalid email format';
       }
@@ -230,7 +232,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
     
     setLoading(true);
     try {
-      const url = '/api/students';
+      const url = `${API_BASE_URL}/students`;
       const method = editData ? 'PUT' : 'POST';
       
       let classIdValue = formData.class_id;
@@ -250,7 +252,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
         }
       }
       
-      // Create payload with all fields including Parent 2
       const payload = {
         admission_no: formData.admission_no,
         full_name: formData.full_name,
@@ -280,7 +281,6 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       const data = await response.json();
       if (response.ok) {
         onSuccess();
-        // Reset form
         setFormData({
           admission_no: '',
           full_name: '',
