@@ -29,7 +29,7 @@ async function findTable(tableName) {
 async function getTableName(baseName) {
   const variations = [
     `sss_${baseName}`,
-    `sgs_${baseName}`,
+    `sss_${baseName}`,
     `${baseName}`
   ];
   

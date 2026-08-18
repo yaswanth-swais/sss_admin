@@ -174,6 +174,7 @@ const [guardianPhotoPreview, setGuardianPhotoPreview] = useState(null);
       setClassInput('');
       setStep(1);
       setErrors({});
+      generateStudentId();
     }
   }, [isOpen, editData]);
 
