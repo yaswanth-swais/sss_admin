@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: "/admin",
   reactStrictMode: true,
   images: {
     remotePatterns: [
@@ -15,8 +14,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Add trailing slash to handle routing properly
-  trailingSlash: true,
 };
 
 export default nextConfig;
