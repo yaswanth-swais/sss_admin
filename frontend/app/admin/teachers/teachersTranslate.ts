@@ -1,0 +1,76 @@
+export const teacherTexts = {
+  pageTitle: "Teacher Management",
+  pageSubtitle: "Manage teacher information and records",
+
+  totalTeachers: "Total Teachers",
+  activeTeachers: "Active Teachers",
+  inactiveTeachers: "Inactive Teachers",
+
+  addTeacher: "Add Teacher",
+  modifyTeacher: "Modify Teacher",
+  saveChanges: "Save Changes",
+  cancel: "Cancel",
+
+  search: "Search teachers...",
+  searchByName: "Search by Name",
+  searchById: "Search by ID",
+  searchBySubject: "Search by Subject",
+
+  id: "ID",
+  name: "Name",
+  subject: "Subject",
+  qualification: "Qualification",
+  classId: "Class",
+  section: "Section",
+  classTeacher: "Class Teacher",
+  contact: "Contact",
+  status: "Status",
+  actions: "Actions",
+
+  active: "Active",
+  inactive: "Inactive",
+  yes: "Yes",
+  no: "No",
+
+  addNewTeacher: "Add New Teacher",
+  teacherName: "Teacher Name",
+  subjectPlaceholder: "Subject",
+  qualificationPlaceholder: "Qualification",
+  classIdPlaceholder: "Class",
+  section1: "Section 1",
+  section2: "Section 2",
+
+  teacher: "Teacher",
+  headTeacher: "Head Teacher",
+  principal: "Principal",
+  isClassTeacher: "Is Class Teacher?",
+  subjectsPlaceholder: "Subjects",
+  contactNumber: "Contact Number",
+  emailPlaceholder: "Email Address",
+
+  fillTeacherName: "Please enter teacher name",
+  invalidEmail: "Please enter a valid Gmail address",
+  enterTeacherId: "Enter Teacher ID",
+  teacherNotFound: "Teacher not found",
+  noTeachersAvailable: "No teachers available",
+  deleteConfirmation: "Are you sure you want to delete this teacher?",
+  error: "Error",
+
+  loadingTeachers: "Loading teachers...",
+  translating: "Translating to",
+
+  transcriptionNotReceived: "Transcription not received",
+  voiceToTextFailed: "Voice to Text failed",
+  microphonePermission: "Please allow microphone permission",
+
+  selectTeacherFirst: "Please select a teacher first",
+  audioNotReceived: "Audio not received from backend",
+  textToVoiceFailed: "Text to Voice failed",
+
+  startRecording: "Start voice recording",
+  stopRecording: "Stop recording",
+  stopAudio: "Stop audio",
+  stop: "Stop",
+  listenSelectedTeacher: "Listen Selected Teacher",
+  selectTeacher: "Select a Teacher",
+};
