@@ -7,9 +7,11 @@ import {
   BookOpen,
   Settings,
   Menu,
+  X,
   LogOut,
 } from "lucide-react";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -72,10 +74,13 @@ function AdminLayoutContent({
   /* ---------------------------------------------------------------------- */
 
   const handleLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
+    if (window.confirm("Are you sure you want to logout from this page?")) {
+      localStorage.clear();
+      sessionStorage.clear();
 
-    router.push("/login");
+      // Redirect to SSS login portal
+      window.location.href = "https://staging.sss.swais.in";
+    }
   };
 
   /* ---------------------------------------------------------------------- */
@@ -117,11 +122,9 @@ function AdminLayoutContent({
         animate={{
           width: sidebarOpen ? "280px" : "80px",
         }}
-        className="fixed left-0 top-0 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 z-50"
+        className="fixed left-0 top-0 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 z-50 overflow-hidden"
       >
-        <div className="p-6">
-          {/* LOGO + SCHOOL NAME */}
-
+        <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-8">
             {sidebarOpen && (
               <motion.div
@@ -129,11 +132,13 @@ function AdminLayoutContent({
                 animate={{ opacity: 1 }}
                 className="flex flex-col items-center w-full"
               >
-                <div className="w-20 h-20 relative rounded-full overflow-hidden border-2 border-yellow-400/40 bg-white/5">
+
+                {/* SSS Logo */}
+                <div className="w-20 h-20 relative rounded-full overflow-hidden border-2 border-yellow-400/40 shadow-lg shadow-yellow-500/20 bg-white/5 flex-shrink-0">
                   <img
                     src="https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
                     alt="SSS School Logo"
-                    className="object-cover"
+                    className="w-full h-full object-cover"
                   />
                 </div>
 
@@ -167,7 +172,7 @@ function AdminLayoutContent({
           {/*                            MENU                                */}
           {/* -------------------------------------------------------------- */}
 
-          <nav className="space-y-2 mt-4">
+          <nav className="space-y-2 mt-4 flex-1">
             {menuItems.map((item) => {
               const isActive =
                 pathname === item.path;
@@ -197,26 +202,25 @@ function AdminLayoutContent({
               );
             })}
           </nav>
-        </div>
 
-        {/* -------------------------------------------------------------- */}
-        {/*                            LOGOUT                              */}
-        {/* -------------------------------------------------------------- */}
+          {/* -------------------------------------------------------------- */}
+          {/*                            LOGOUT                              */}
+          {/* -------------------------------------------------------------- */}
 
-        <div className="absolute bottom-12 left-0 right-0 px-6">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10"
-          >
-            <LogOut size={20} />
+          <div className="pt-4 border-t border-white/10">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <LogOut size={20} />
 
-            {sidebarOpen && (
-              <span className="font-medium">
-                {translations.logout ||
-                  adminTexts.logout}
-              </span>
-            )}
-          </button>
+              {sidebarOpen && (
+                <span className="font-medium">
+                  {translations.logout || adminTexts.logout}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </motion.aside>
 
@@ -269,35 +273,32 @@ function AdminLayoutContent({
 
                 <select
                   value={language}
-                  onChange={(e) =>
-                    setLanguage(e.target.value)
-                  }
+                  onChange={(e) => setLanguage(e.target.value)}
                   className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 text-sm"
                 >
-                  <option
-                    value="English"
-                    className="text-black"
-                  >
+                  <option value="English" className="text-black">
                     English
                   </option>
 
-                  <option
-                    value="Telugu"
-                    className="text-black"
-                  >
+                  <option value="Telugu" className="text-black">
                     Telugu
                   </option>
 
-                  <option
-                    value="Hindi"
-                    className="text-black"
-                  >
+                  <option value="Hindi" className="text-black">
                     Hindi
                   </option>
                 </select>
 
-                {/* ADMIN DETAILS */}
+                {/* SSS Logo in Header */}
 
+                <div className="w-12 h-12 relative rounded-full overflow-hidden border border-yellow-400/20 flex-shrink-0">
+                  <img
+                    src="https://www.image2url.com/r2/default/images/1780034724660-ae70f995-be5a-4e65-a6bd-4afb19e192d7.jpg"
+                    alt="SSS School Logo"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
                 <div className="text-right">
                   <p className="text-white text-sm font-medium">
                     {translations.adminRole ||
@@ -325,7 +326,6 @@ function AdminLayoutContent({
     </div>
   );
 }
-
 /* -------------------------------------------------------------------------- */
 /*                          ADMIN LAYOUT PROVIDER                              */
 /* -------------------------------------------------------------------------- */

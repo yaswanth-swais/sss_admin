@@ -17,37 +17,22 @@ import {
   Trash2,
   Mic,
   Volume2,
-  X,
+  BookOpen,
   Users as UsersIcon,
   UserCheck,
   UserX,
-  BookOpen,
 } from "lucide-react";
 
-interface Student {
-  id: string;
-  admissionNo: string;
-  name: string;
-  class: string;
-  section: string;
-  rollNo: string;
-  parentName: string;
-  parentPhone: string;
-  parentEmail: string;
-  contact: string;
-  email: string;
-  guardianName: string;
-  guardianPhone: string;
-  status: "active" | "inactive";
-}
+import StudentFormWizard from "../../../components/StudentFormWizard";
 
-type SearchType =
-  | "name"
-  | "id"
-  | "class"
-  | "section";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 export default function StudentsPage() {
+  /* ============================================================
+     LANGUAGE / AI
+  ============================================================ */
+
   const {
     language,
     translations,
@@ -55,79 +40,78 @@ export default function StudentsPage() {
     translating,
   } = useLanguage();
 
-  const t = (key: keyof typeof studentTexts) =>
-    translations?.[key] || studentTexts[key];
+  const t = (key) =>
+    translations?.[key] || studentTexts[key] || key;
 
-  const [students, setStudents] =
-    useState<Student[]>([]);
+  /* ============================================================
+     STUDENTS
+  ============================================================ */
 
-  const [loading, setLoading] =
-    useState(true);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [searchTerm, setSearchTerm] =
-    useState("");
+  /* ============================================================
+     SEARCH
+  ============================================================ */
 
-  const [searchType, setSearchType] =
-    useState<SearchType>("name");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchType, setSearchType] = useState("name");
 
-  const [isRecording, setIsRecording] =
-    useState(false);
+  /* ============================================================
+     STUDENT FORM WIZARD
+  ============================================================ */
 
-  const [isModalOpen, setIsModalOpen] =
-    useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState("add");
+  const [editingStudent, setEditingStudent] = useState(null);
 
-  const [modalType, setModalType] =
-    useState<"add" | "modify">("add");
+  /* ============================================================
+     VOICE TO TEXT
+  ============================================================ */
 
-  const [selectedStudent, setSelectedStudent] =
-    useState<Student | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+
+  const mediaRecorderRef =
+    useRef(null);
+
+  const audioChunksRef =
+    useRef([]);
+
+  const mediaStreamRef =
+    useRef(null);
+
+  /* ============================================================
+     TEXT TO VOICE
+  ============================================================ */
 
   const [
     selectedStudentForVoice,
     setSelectedStudentForVoice,
-  ] = useState<Student | null>(null);
+  ] = useState(null);
 
   const [isPlaying, setIsPlaying] =
     useState(false);
 
-  const mediaRecorderRef =
-    useRef<MediaRecorder | null>(null);
-
-  const audioChunksRef =
-    useRef<Blob[]>([]);
-
-  const mediaStreamRef =
-    useRef<MediaStream | null>(null);
-
   const audioRef =
-    useRef<HTMLAudioElement | null>(null);
+    useRef(null);
 
-  const [formData, setFormData] =
-    useState({
-      admissionNo: "",
-      name: "",
-      class: "",
-      section: "",
-      rollNo: "",
-      parentName: "",
-      parentPhone: "",
-      parentEmail: "",
-      contact: "",
-      email: "",
-      guardianName: "",
-      guardianPhone: "",
-    });
-
-  /* -------------------------------------------------------------------------- */
-  /*                          FETCH STUDENTS                                     */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     FETCH STUDENTS
+  ============================================================ */
 
   const fetchStudents = async () => {
-    setLoading(true);
-
     try {
-      const response =
-        await fetch("/api/students");
+      setLoading(true);
+
+      const response = await fetch(
+        `${API_BASE_URL}/students`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch students: ${response.status}`
+        );
+      }
 
       const data = await response.json();
 
@@ -136,26 +120,188 @@ export default function StudentsPage() {
         data
       );
 
-      if (data.success) {
-        setStudents(
-          Array.isArray(data.students)
-            ? data.students
-            : []
-        );
-      }
+      /*
+       * Backend may return either:
+       *
+       * 1. Array
+       * 2. { success: true, students: [...] }
+       */
+
+      const studentsArray =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data?.students)
+          ? data.students
+          : [];
+
+      const mappedStudents =
+        studentsArray.map((s) => ({
+          /* -------------------------------
+             ID
+          -------------------------------- */
+
+          id:
+            s.admission_no ||
+            s.student_id ||
+            s.id,
+
+          student_id:
+            s.student_id ||
+            s.admission_no ||
+            s.id,
+
+          admission_no:
+            s.admission_no ||
+            s.student_id ||
+            "",
+
+          /* -------------------------------
+             STUDENT
+          -------------------------------- */
+
+          name:
+            s.full_name ||
+            s.name ||
+            "",
+
+          full_name:
+            s.full_name ||
+            s.name ||
+            "",
+
+          class:
+            s.class ||
+            s.class_name ||
+            s.class_id ||
+            "",
+
+          class_id:
+            s.class_id || "",
+
+          section:
+            s.section || "",
+
+          roll_no:
+            s.roll_no || "",
+
+          /* -------------------------------
+             PARENT 1
+          -------------------------------- */
+
+          parent1_name:
+            s.parent1_name ||
+            "",
+
+          parent1_phone:
+            s.parent1_phone ||
+            "",
+
+          parent1_email:
+            s.parent1_email ||
+            "",
+
+          /* -------------------------------
+             PARENT 2
+          -------------------------------- */
+
+          parent2_name:
+            s.parent2_name ||
+            "",
+
+          parent2_phone:
+            s.parent2_phone ||
+            "",
+
+          parent2_email:
+            s.parent2_email ||
+            "",
+
+          /* -------------------------------
+             STUDENT CONTACT
+          -------------------------------- */
+
+          student_contact:
+            s.student_phone ||
+            s.student_contact ||
+            "",
+
+          student_phone:
+            s.student_phone ||
+            "",
+
+          student_email:
+            s.student_email ||
+            "",
+
+          /* -------------------------------
+             GUARDIAN
+          -------------------------------- */
+
+          guardian_name:
+            s.guardian_name ||
+            "",
+
+          guardian_phone:
+            s.guardian_phone ||
+            "",
+
+          guardian_email:
+            s.guardian_email ||
+            "",
+
+          /* -------------------------------
+             STATUS
+          -------------------------------- */
+
+          status:
+            s.record_status === "Active"
+              ? "Active"
+              : s.status === "Active"
+              ? "Active"
+              : s.status === "active"
+              ? "Active"
+              : "Inactive",
+
+          record_status:
+            s.record_status || "Active",
+
+          /* -------------------------------
+             PHOTO
+          -------------------------------- */
+
+          student_photo_key:
+            s.student_photo_key ||
+            null,
+
+          parent1_photo_key:
+            s.parent1_photo_key ||
+            null,
+
+          parent2_photo_key:
+            s.parent2_photo_key ||
+            null,
+
+          guardian_photo_key:
+            s.guardian_photo_key ||
+            null,
+        }));
+
+      setStudents(mappedStudents);
     } catch (error) {
       console.error(
         "Error fetching students:",
         error
       );
+
+      setStudents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  /* -------------------------------------------------------------------------- */
-  /*                       INITIAL LOAD / CLEANUP                                */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     INITIAL LOAD / CLEANUP
+  ============================================================ */
 
   useEffect(() => {
     fetchStudents();
@@ -174,15 +320,12 @@ export default function StudentsPage() {
     };
   }, []);
 
-  /* -------------------------------------------------------------------------- */
-  /*                       DYNAMIC STUDENT TEXTS                                 */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     DYNAMIC STUDENT TRANSLATION
+  ============================================================ */
 
   const getDynamicStudentTexts = () => {
-    const dynamicTexts: Record<
-      string,
-      string
-    > = {};
+    const dynamicTexts = {};
 
     students.forEach((student) => {
       if (student.name) {
@@ -191,27 +334,29 @@ export default function StudentsPage() {
         ] = student.name;
       }
 
-      if (student.parentName) {
+      if (student.parent1_name) {
         dynamicTexts[
           `parentName_${student.id}`
-        ] = student.parentName;
+        ] = student.parent1_name;
       }
 
-      if (student.guardianName) {
+      if (student.guardian_name) {
         dynamicTexts[
           `guardianName_${student.id}`
-        ] = student.guardianName;
+        ] = student.guardian_name;
       }
     });
 
     return dynamicTexts;
   };
 
-  /* -------------------------------------------------------------------------- */
-  /*                       ONE BULK TRANSLATION CALL                             */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     BULK TRANSLATION
+  ============================================================ */
 
   useEffect(() => {
+    if (!students.length) return;
+
     const dynamicTexts =
       getDynamicStudentTexts();
 
@@ -223,18 +368,33 @@ export default function StudentsPage() {
     translateBulk(allTexts);
   }, [language, students]);
 
-  /* -------------------------------------------------------------------------- */
-  /*                          VOICE TO TEXT                                      */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     VOICE TO TEXT
+  ============================================================ */
 
   const handleVoiceToText =
     async () => {
+      /*
+       * Stop recording if already recording
+       */
+
       if (isRecording) {
         mediaRecorderRef.current?.stop();
         return;
       }
 
       try {
+        if (
+          !navigator.mediaDevices ||
+          !navigator.mediaDevices.getUserMedia
+        ) {
+          alert(
+            t("allowMicrophone")
+          );
+
+          return;
+        }
+
         const stream =
           await navigator.mediaDevices.getUserMedia(
             {
@@ -253,15 +413,17 @@ export default function StudentsPage() {
 
         audioChunksRef.current = [];
 
-        mediaRecorder.ondataavailable = (
-          event: BlobEvent
-        ) => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(
-              event.data
-            );
-          }
-        };
+        mediaRecorder.ondataavailable =
+          (event) => {
+            if (
+              event.data &&
+              event.data.size > 0
+            ) {
+              audioChunksRef.current.push(
+                event.data
+              );
+            }
+          };
 
         mediaRecorder.onstop =
           async () => {
@@ -283,9 +445,7 @@ export default function StudentsPage() {
               const extension =
                 mimeType.includes("ogg")
                   ? "ogg"
-                  : mimeType.includes(
-                      "mp4"
-                    )
+                  : mimeType.includes("mp4")
                   ? "mp4"
                   : "webm";
 
@@ -329,11 +489,14 @@ export default function StudentsPage() {
               const transcribedText =
                 response?.text ||
                 response?.transcription ||
-                response?.transcribed_text;
+                response?.transcribed_text ||
+                "";
 
-              if (transcribedText) {
+              if (
+                transcribedText.trim()
+              ) {
                 setSearchTerm(
-                  transcribedText
+                  transcribedText.trim()
                 );
               } else {
                 alert(
@@ -349,7 +512,9 @@ export default function StudentsPage() {
               );
 
               alert(
-                t("voiceToTextFailed")
+                t(
+                  "voiceToTextFailed"
+                )
               );
             } finally {
               mediaStreamRef.current
@@ -377,24 +542,32 @@ export default function StudentsPage() {
           error
         );
 
+        setIsRecording(false);
+
         alert(
           t("allowMicrophone")
         );
       }
     };
 
-  /* -------------------------------------------------------------------------- */
-  /*                          TEXT TO VOICE                                      */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     TEXT TO VOICE
+  ============================================================ */
 
   const handleTextToVoice =
     async () => {
+      /*
+       * Stop current audio
+       */
+
       if (
         isPlaying &&
         audioRef.current
       ) {
         audioRef.current.pause();
+
         audioRef.current.currentTime = 0;
+
         audioRef.current = null;
 
         setIsPlaying(false);
@@ -418,39 +591,86 @@ export default function StudentsPage() {
           student.name ||
           "not available"
         }.`,
+
         `Admission number ${
-          student.admissionNo ||
+          student.admission_no ||
           "not available"
         }.`,
+
         `Class ${
           student.class ||
           "not assigned"
         }.`,
+
         `Section ${
           student.section ||
           "not assigned"
         }.`,
+
         `Roll number ${
-          student.rollNo ||
+          student.roll_no ||
           "not available"
         }.`,
-        `Parent name ${
-          student.parentName ||
+
+        `Parent 1 name ${
+          student.parent1_name ||
           "not available"
         }.`,
-        `Parent phone ${
-          student.parentPhone ||
+
+        `Parent 1 phone ${
+          student.parent1_phone ||
           "not available"
         }.`,
+
+        `Parent 1 email ${
+          student.parent1_email ||
+          "not available"
+        }.`,
+
+        `Parent 2 name ${
+          student.parent2_name ||
+          "not available"
+        }.`,
+
+        `Parent 2 phone ${
+          student.parent2_phone ||
+          "not available"
+        }.`,
+
+        `Parent 2 email ${
+          student.parent2_email ||
+          "not available"
+        }.`,
+
         `Student contact ${
-          student.contact ||
+          student.student_phone ||
           "not available"
         }.`,
+
         `Student email ${
-          student.email ||
+          student.student_email ||
           "not available"
         }.`,
-        `Status ${student.status}.`,
+
+        `Guardian name ${
+          student.guardian_name ||
+          "not available"
+        }.`,
+
+        `Guardian phone ${
+          student.guardian_phone ||
+          "not available"
+        }.`,
+
+        `Guardian email ${
+          student.guardian_email ||
+          "not available"
+        }.`,
+
+        `Status ${
+          student.status ||
+          "not available"
+        }.`,
       ].join(" ");
 
       try {
@@ -473,9 +693,10 @@ export default function StudentsPage() {
           return;
         }
 
-        const audio = new Audio(
-          `data:audio/mpeg;base64,${response.audio_base64}`
-        );
+        const audio =
+          new Audio(
+            `data:audio/mpeg;base64,${response.audio_base64}`
+          );
 
         audioRef.current = audio;
 
@@ -508,118 +729,113 @@ export default function StudentsPage() {
       }
     };
 
-  /* -------------------------------------------------------------------------- */
-  /*                              VALIDATION                                    */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     OPEN STUDENT WIZARD
+  ============================================================ */
 
-  const validateEmail = (
-    email: string
-  ): boolean => {
-    if (!email) return true;
+  const openModal = (
+    type,
+    student = null
+  ) => {
+    setModalType(type);
 
-    return email
-      .toLowerCase()
-      .endsWith("@gmail.com");
+    if (type === "add") {
+      setEditingStudent(null);
+    } else {
+      setEditingStudent(student);
+    }
+
+    setIsModalOpen(true);
   };
 
-  /* -------------------------------------------------------------------------- */
-  /*                               ADD STUDENT                                  */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     WIZARD SUCCESS
+  ============================================================ */
 
-  const handleAdd = async () => {
-    if (!formData.name.trim()) {
-      alert(
-        t("fillStudentName")
-      );
+  const handleWizardSuccess =
+    async () => {
+      await fetchStudents();
+    };
 
-      return;
-    }
+  /* ============================================================
+     WIZARD CLOSE
+  ============================================================ */
 
-    if (
-      formData.email &&
-      !validateEmail(
-        formData.email
-      )
-    ) {
-      alert(
-        t("invalidStudentEmail")
-      );
+  const handleWizardClose = () => {
+    setIsModalOpen(false);
+    setEditingStudent(null);
+  };
 
-      return;
-    }
+  /* ============================================================
+     DELETE STUDENT
+  ============================================================ */
 
-    if (
-      formData.parentEmail &&
-      !validateEmail(
-        formData.parentEmail
-      )
-    ) {
-      alert(
-        t("invalidParentEmail")
-      );
+  const handleDelete =
+    async (student) => {
+      const id =
+        student.admission_no ||
+        student.student_id ||
+        student.id;
 
-      return;
-    }
+      if (
+        !confirm(
+          t("deleteConfirmation") ||
+            "Are you sure you want to delete this student?"
+        )
+      ) {
+        return;
+      }
 
-    try {
-      const response =
-        await fetch(
-          "/api/students",
-          {
-            method: "POST",
+      try {
+        /*
+         * Use the same API style as the latest main branch.
+         */
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+        const response =
+          await fetch(
+            `${API_BASE_URL}/students?id=${encodeURIComponent(
+              id
+            )}`,
+            {
+              method: "DELETE",
+            }
+          );
 
-            body: JSON.stringify({
-              ...formData,
-              status: "active",
-            }),
-          }
+        if (!response.ok) {
+          throw new Error(
+            `Delete failed: ${response.status}`
+          );
+        }
+
+        await fetchStudents();
+      } catch (error) {
+        console.error(
+          "Error deleting student:",
+          error
         );
 
-      const data =
-        await response.json();
-
-      if (data.success) {
-        await fetchStudents();
-
-        setIsModalOpen(false);
-
-        resetForm();
-      } else {
         alert(
-          `Error: ${
-            data.error || ""
-          }`
+          t("errorDeletingStudent") ||
+            "Error deleting student"
         );
       }
-    } catch (error) {
-      console.error(
-        "Error adding student:",
-        error
-      );
+    };
 
-      alert(
-        t("errorAddingStudent")
-      );
-    }
-  };
+  /* ============================================================
+     TOGGLE STATUS
+  ============================================================ */
 
-  /* -------------------------------------------------------------------------- */
-  /*                            MODIFY STUDENT                                  */
-  /* -------------------------------------------------------------------------- */
-
-  const handleModify =
-    async () => {
-      if (!selectedStudent) return;
+  const handleToggleStatus =
+    async (student) => {
+      const newStatus =
+        student.status === "Active"
+          ? "Inactive"
+          : "Active";
 
       try {
         const response =
           await fetch(
-            `/api/students/${selectedStudent.id}`,
+            `${API_BASE_URL}/students`,
             {
               method: "PUT",
 
@@ -628,108 +844,18 @@ export default function StudentsPage() {
                   "application/json",
               },
 
-              body: JSON.stringify(
-                formData
-              ),
+              body: JSON.stringify({
+                ...student,
+                status: newStatus,
+              }),
             }
           );
 
-        const data =
-          await response.json();
-
-        if (data.success) {
-          await fetchStudents();
-
-          setIsModalOpen(false);
-
-          resetForm();
-        } else {
-          alert(
-            `Error: ${
-              data.error || ""
-            }`
+        if (!response.ok) {
+          throw new Error(
+            `Status update failed: ${response.status}`
           );
         }
-      } catch (error) {
-        console.error(
-          "Error modifying student:",
-          error
-        );
-
-        alert(
-          t(
-            "errorModifyingStudent"
-          )
-        );
-      }
-    };
-
-  /* -------------------------------------------------------------------------- */
-  /*                               DELETE                                       */
-  /* -------------------------------------------------------------------------- */
-
-  const handleDelete =
-    async (id: string) => {
-      if (
-        !confirm(
-          t("deleteConfirmation")
-        )
-      ) {
-        return;
-      }
-
-      try {
-        await fetch(
-          `/api/students/${id}`,
-          {
-            method: "DELETE",
-          }
-        );
-
-        await fetchStudents();
-      } catch (error) {
-        console.error(
-          "Error deleting student:",
-          error
-        );
-      }
-    };
-
-  /* -------------------------------------------------------------------------- */
-  /*                              STATUS                                        */
-  /* -------------------------------------------------------------------------- */
-
-  const handleToggleStatus =
-    async (id: string) => {
-      const student =
-        students.find(
-          (item) =>
-            item.id === id
-        );
-
-      if (!student) return;
-
-      const newStatus =
-        student.status === "active"
-          ? "inactive"
-          : "active";
-
-      try {
-        await fetch(
-          `/api/students/${id}`,
-          {
-            method: "PATCH",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              status: newStatus,
-            }),
-          }
-        );
 
         await fetchStudents();
       } catch (error) {
@@ -740,184 +866,121 @@ export default function StudentsPage() {
       }
     };
 
-  /* -------------------------------------------------------------------------- */
-  /*                              RESET                                         */
-  /* -------------------------------------------------------------------------- */
-
-  const resetForm = () => {
-    setFormData({
-      admissionNo: "",
-      name: "",
-      class: "",
-      section: "",
-      rollNo: "",
-      parentName: "",
-      parentPhone: "",
-      parentEmail: "",
-      contact: "",
-      email: "",
-      guardianName: "",
-      guardianPhone: "",
-    });
-
-    setSelectedStudent(null);
-  };
-
-  /* -------------------------------------------------------------------------- */
-  /*                               MODAL                                        */
-  /* -------------------------------------------------------------------------- */
-
-  const openModal = (
-    type: "add" | "modify",
-    student?: Student
-  ) => {
-    setModalType(type);
-
-    if (
-      type === "modify" &&
-      student
-    ) {
-      setSelectedStudent(
-        student
-      );
-
-      setFormData({
-        admissionNo:
-          student.admissionNo ||
-          "",
-        name: student.name || "",
-        class: student.class || "",
-        section:
-          student.section || "",
-        rollNo:
-          student.rollNo || "",
-        parentName:
-          student.parentName ||
-          "",
-        parentPhone:
-          student.parentPhone ||
-          "",
-        parentEmail:
-          student.parentEmail ||
-          "",
-        contact:
-          student.contact || "",
-        email:
-          student.email || "",
-        guardianName:
-          student.guardianName ||
-          "",
-        guardianPhone:
-          student.guardianPhone ||
-          "",
-      });
-    } else {
-      resetForm();
-    }
-
-    setIsModalOpen(true);
-  };
-
-  /* -------------------------------------------------------------------------- */
-  /*                                FILTER                                     */
-  /* -------------------------------------------------------------------------- */
+  /* ============================================================
+     FILTER
+  ============================================================ */
 
   const filteredStudents =
-    students.filter(
-      (student) => {
-        const term =
-          searchTerm.toLowerCase();
+    Array.isArray(students)
+      ? students.filter(
+          (student) => {
+            const term =
+              searchTerm
+                .toLowerCase()
+                .trim();
 
-        if (
-          searchType === "id"
-        ) {
-          return String(
-            student.id
-          ).includes(searchTerm);
-        }
+            if (!term) {
+              return true;
+            }
 
-        if (
-          searchType === "class"
-        ) {
-          return (
-            student.class
-              ?.toLowerCase() ||
-            ""
-          ).includes(term);
-        }
+            if (
+              searchType === "name"
+            ) {
+              return (
+                student.name
+                  ?.toLowerCase()
+                  .includes(term) ||
+                false
+              );
+            }
 
-        if (
-          searchType === "section"
-        ) {
-          return (
-            student.section
-              ?.toLowerCase() ||
-            ""
-          ).includes(term);
-        }
+            if (
+              searchType === "id"
+            ) {
+              return (
+                String(
+                  student.admission_no ||
+                    ""
+                )
+                  .toLowerCase()
+                  .includes(term) ||
+                String(
+                  student.student_id ||
+                    ""
+                )
+                  .toLowerCase()
+                  .includes(term)
+              );
+            }
 
-        return (
-          student.name
-            ?.toLowerCase() ||
-          ""
-        ).includes(term);
-      }
-    );
+            if (
+              searchType === "class"
+            ) {
+              return String(
+                student.class || ""
+              )
+                .toLowerCase()
+                .includes(term);
+            }
 
-  /* -------------------------------------------------------------------------- */
-  /*                                 STATS                                      */
-  /* -------------------------------------------------------------------------- */
+            if (
+              searchType === "section"
+            ) {
+              return (
+                student.section
+                  ?.toLowerCase()
+                  .includes(term) ||
+                false
+              );
+            }
 
-  const stats = [
-    {
-      label:
-        t("totalStudents"),
-      value: students.length,
-      icon: UsersIcon,
-      color:
-        "from-blue-500 to-cyan-500",
-    },
-    {
-      label:
-        t("activeStudents"),
-      value:
-        students.filter(
-          (student) =>
-            student.status ===
-            "active"
-        ).length,
-      icon: UserCheck,
-      color:
-        "from-green-500 to-emerald-500",
-    },
-    {
-      label:
-        t("inactiveStudents"),
-      value:
-        students.filter(
-          (student) =>
-            student.status ===
-            "inactive"
-        ).length,
-      icon: UserX,
-      color:
-        "from-orange-500 to-red-500",
-    },
-  ];
+            return true;
+          }
+        )
+      : [];
+
+  /* ============================================================
+     STATS
+  ============================================================ */
+
+  const stats = {
+    total: students.length,
+
+    active: students.filter(
+      (student) =>
+        student.status === "Active"
+    ).length,
+
+    inactive: students.filter(
+      (student) =>
+        student.status === "Inactive"
+    ).length,
+  };
+
+  /* ============================================================
+     LOADING
+  ============================================================ */
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-white/60">
-          {t("loadingStudents")}
+          {t("loadingStudents") ||
+            "Loading students..."}
         </div>
       </div>
     );
   }
 
+  /* ============================================================
+     UI
+  ============================================================ */
+
   return (
     <div>
-      {/* TRANSLATION OVERLAY */}
+      {/* ======================================================
+          TRANSLATION OVERLAY
+      ====================================================== */}
 
       {translating &&
         language !== "English" && (
@@ -926,67 +989,127 @@ export default function StudentsPage() {
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
 
               <span className="font-medium">
-                {t("translating")}{" "}
+                {t("translating") ||
+                  "Translating"}{" "}
                 {language}...
               </span>
             </div>
           </div>
         )}
 
-      {/* PAGE HEADER */}
+      {/* ======================================================
+          PAGE HEADER
+      ====================================================== */}
 
       <motion.div className="mb-8">
         <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
           <BookOpen className="w-10 h-10 text-blue-400" />
 
-          {t("pageTitle")}
+          {t("pageTitle") ||
+            "Student Management"}
         </h1>
 
         <p className="text-white/60">
-          {t("pageSubtitle")}
+          {t("pageSubtitle") ||
+            "Manage all students, track their progress, and update records"}
         </p>
       </motion.div>
 
-      {/* STATS */}
+      {/* ======================================================
+          STATS
+      ====================================================== */}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {stats.map(
-          (stat, index) => (
-            <div
-              key={index}
-              className={`bg-gradient-to-r ${stat.color} rounded-2xl p-6 shadow-xl`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/80 text-sm">
-                    {stat.label}
-                  </p>
+        {/* TOTAL */}
 
-                  <p className="text-white text-4xl font-bold mt-2">
-                    {stat.value}
-                  </p>
-                </div>
+        <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/80 text-sm">
+                {t("totalStudents") ||
+                  "Total Students"}
+              </p>
 
-                <stat.icon className="w-12 h-12 text-white/30" />
-              </div>
+              <p className="text-white text-4xl font-bold mt-2">
+                {stats.total}
+              </p>
+
+              <p className="text-white/60 text-sm mt-2">
+                Enrolled students
+              </p>
             </div>
-          )
-        )}
+
+            <UsersIcon className="w-12 h-12 text-white/30" />
+          </div>
+        </div>
+
+        {/* ACTIVE */}
+
+        <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/80 text-sm">
+                {t("activeStudents") ||
+                  "Active Students"}
+              </p>
+
+              <p className="text-white text-4xl font-bold mt-2">
+                {stats.active}
+              </p>
+
+              <p className="text-white/60 text-sm mt-2">
+                Currently attending
+              </p>
+            </div>
+
+            <UserCheck className="w-12 h-12 text-white/30" />
+          </div>
+        </div>
+
+        {/* INACTIVE */}
+
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/80 text-sm">
+                {t("inactiveStudents") ||
+                  "Inactive Students"}
+              </p>
+
+              <p className="text-white text-4xl font-bold mt-2">
+                {stats.inactive}
+              </p>
+
+              <p className="text-white/60 text-sm mt-2">
+                Not currently enrolled
+              </p>
+            </div>
+
+            <UserX className="w-12 h-12 text-white/30" />
+          </div>
+        </div>
       </div>
 
-      {/* ACTION BUTTONS */}
+      {/* ======================================================
+          ACTION BUTTONS
+      ====================================================== */}
 
       <div className="flex gap-4 mb-8">
+        {/* ADD */}
+
         <button
           onClick={() =>
             openModal("add")
           }
-          className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold flex items-center gap-2"
+          className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition"
         >
           <Plus size={20} />
 
-          {t("addStudent")}
+          {t("addStudent") ||
+            "Add Student"}
         </button>
+
+        {/* MODIFY */}
 
         <button
           onClick={() => {
@@ -1002,66 +1125,61 @@ export default function StudentsPage() {
               return;
             }
 
-            if (
-              filteredStudents.length >
-              0
-            ) {
-              const id =
-                prompt(
-                  t(
-                    "enterStudentId"
-                  )
-                );
-
-              if (!id) return;
-
-              const student =
-                students.find(
-                  (item) =>
-                    String(
-                      item.id
-                    ) === id
-                );
-
-              if (student) {
-                openModal(
-                  "modify",
-                  student
-                );
-              } else {
-                alert(
-                  t(
-                    "studentNotFound"
-                  )
-                );
-              }
-
-              return;
-            }
-
-            alert(
-              t(
-                "noStudentsAvailable"
-              )
+            const id = prompt(
+              t("enterStudentId") ||
+                "Enter Admission Number or Student ID to modify:"
             );
+
+            if (!id) return;
+
+            const student =
+              students.find(
+                (item) =>
+                  String(
+                    item.admission_no
+                  ) ===
+                    String(id) ||
+                  String(
+                    item.student_id
+                  ) ===
+                    String(id) ||
+                  String(item.id) ===
+                    String(id)
+              );
+
+            if (student) {
+              openModal(
+                "modify",
+                student
+              );
+            } else {
+              alert(
+                t("studentNotFound") ||
+                  "Student not found!"
+              );
+            }
           }}
-          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold flex items-center gap-2"
+          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg transition"
         >
           <Pencil size={20} />
 
-          {t("modifyStudent")}
+          {t("modifyStudent") ||
+            "Modify Student"}
         </button>
       </div>
 
-      {/* SEARCH */}
+      {/* ======================================================
+          SEARCH
+      ====================================================== */}
 
       <div className="flex flex-wrap gap-4 mb-4">
         <div className="flex-1 min-w-[200px] relative">
           <input
             type="text"
-            placeholder={t(
-              "search"
-            )}
+            placeholder={
+              t("search") ||
+              "Search by name, ID, class, or section..."
+            }
             value={searchTerm}
             onChange={(event) =>
               setSearchTerm(
@@ -1070,6 +1188,8 @@ export default function StudentsPage() {
             }
             className="w-full px-4 py-3 pr-16 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40"
           />
+
+          {/* VOICE SEARCH */}
 
           <button
             type="button"
@@ -1080,10 +1200,12 @@ export default function StudentsPage() {
               isRecording
                 ? t(
                     "stopRecording"
-                  )
+                  ) ||
+                  "Stop recording"
                 : t(
                     "startRecording"
-                  )
+                  ) ||
+                  "Start voice search"
             }
             className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full transition flex items-center justify-center ${
               isRecording
@@ -1098,12 +1220,13 @@ export default function StudentsPage() {
           </button>
         </div>
 
+        {/* SEARCH TYPE */}
+
         <select
           value={searchType}
           onChange={(event) =>
             setSearchType(
-              event.target
-                .value as SearchType
+              event.target.value
             )
           }
           className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-white/40"
@@ -1112,37 +1235,39 @@ export default function StudentsPage() {
             value="name"
             className="text-black"
           >
-            {t("searchByName")}
+            {t("searchByName") ||
+              "Search by Name"}
           </option>
 
           <option
             value="id"
             className="text-black"
           >
-            {t("searchById")}
+            {t("searchById") ||
+              "Search by ID"}
           </option>
 
           <option
             value="class"
             className="text-black"
           >
-            {t(
-              "searchByClass"
-            )}
+            {t("searchByClass") ||
+              "Search by Class"}
           </option>
 
           <option
             value="section"
             className="text-black"
           >
-            {t(
-              "searchBySection"
-            )}
+            {t("searchBySection") ||
+              "Search by Section"}
           </option>
         </select>
       </div>
 
-      {/* LISTEN */}
+      {/* ======================================================
+          TEXT TO VOICE
+      ====================================================== */}
 
       <div className="flex justify-end mb-6">
         <button
@@ -1156,19 +1281,24 @@ export default function StudentsPage() {
           }
           title={
             isPlaying
-              ? t("stopAudio")
+              ? t("stopAudio") ||
+                "Stop audio"
               : selectedStudentForVoice
-              ? `${t(
-                  "listenSelectedStudent"
-                )}: ${
-                  translations[
+              ? `${
+                  t(
+                    "listenSelectedStudent"
+                  ) ||
+                  "Listen"
+                }: ${
+                  translations?.[
                     `studentName_${selectedStudentForVoice.id}`
                   ] ||
                   selectedStudentForVoice.name
                 }`
               : t(
                   "selectStudentFirst"
-                )
+                ) ||
+                "Select a student first"
           }
           className={`flex items-center gap-2 rounded-xl px-4 py-2 font-medium transition ${
             isPlaying
@@ -1181,564 +1311,373 @@ export default function StudentsPage() {
           <Volume2 size={20} />
 
           {isPlaying
-            ? t("stop")
+            ? t("stop") || "Stop"
             : selectedStudentForVoice
             ? t(
                 "listenSelectedStudent"
-              )
-            : t(
-                "selectStudent"
-              )}
+              ) ||
+              "Listen"
+            : t("selectStudent") ||
+              "Select Student"}
         </button>
       </div>
 
-      {/* TABLE */}
+      {/* ======================================================
+          STUDENT TABLE
+      ====================================================== */}
 
-      <div className="bg-white/5 backdrop-blur-xl rounded-2xl overflow-x-auto">
-        <table className="w-full min-w-[1600px]">
-          <thead className="bg-white/10">
-            <tr>
-              <th className="px-4 py-4 text-left text-white">
-                ID
-              </th>
+      <div className="bg-white/5 backdrop-blur-xl rounded-2xl overflow-hidden border border-white/10">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1700px]">
+            <thead className="bg-white/10">
+              <tr>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  ID
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "admissionNo"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("admissionNo") ||
+                    "Admission No"}
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t("name")}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("name") ||
+                    "Name"}
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t("class")}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("class") ||
+                    "Class"}
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t("section")}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("section") ||
+                    "Section"}
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t("rollNo")}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("rollNo") ||
+                    "Roll No"}
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "parentName"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Parent 1 Name
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "parentPhone"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Parent 1 Phone
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "parentEmail"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Parent 1 Email
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "studentContact"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Parent 2 Name
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "studentEmail"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Parent 2 Phone
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "guardianName"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Parent 2 Email
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t(
-                  "guardianPhone"
-                )}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Student Contact
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t("status")}
-              </th>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Student Email
+                </th>
 
-              <th className="px-4 py-4 text-left text-white">
-                {t("actions")}
-              </th>
-            </tr>
-          </thead>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Guardian Name
+                </th>
 
-          <tbody>
-            {filteredStudents.map(
-              (student) => (
-                <tr
-                  key={student.id}
-                  onClick={() =>
-                    setSelectedStudentForVoice(
-                      student
-                    )
-                  }
-                  className={`cursor-pointer border-t transition ${
-                    selectedStudentForVoice?.id ===
-                    student.id
-                      ? "border-purple-500 bg-purple-500/10 ring-1 ring-inset ring-purple-500/40"
-                      : "border-white/10 hover:bg-white/5"
-                  }`}
-                >
-                  <td className="px-4 py-4 text-white/80">
-                    {student.id}
-                  </td>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Guardian Phone
+                </th>
 
-                  <td className="px-4 py-4 text-white/80">
-                    {student.admissionNo ||
-                      "—"}
-                  </td>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  Guardian Email
+                </th>
 
-                  <td className="px-4 py-4 text-white font-medium">
-                    {translations[
-                      `studentName_${student.id}`
-                    ] ||
-                      student.name ||
-                      "—"}
-                  </td>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("status") ||
+                    "Status"}
+                </th>
 
-                  <td className="px-4 py-4 text-white/80">
-                    {student.class ||
-                      "—"}
-                  </td>
+                <th className="px-4 py-4 text-left text-white text-sm">
+                  {t("actions") ||
+                    "Actions"}
+                </th>
+              </tr>
+            </thead>
 
-                  <td className="px-4 py-4 text-white/80">
-                    {student.section ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {student.rollNo ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {translations[
-                      `parentName_${student.id}`
-                    ] ||
-                      student.parentName ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {student.parentPhone ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {student.parentEmail ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {student.contact ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {student.email ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {translations[
-                      `guardianName_${student.id}`
-                    ] ||
-                      student.guardianName ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4 text-white/80">
-                    {student.guardianPhone ||
-                      "—"}
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <button
-                      onClick={(
-                        event
-                      ) => {
-                        event.stopPropagation();
-
-                        handleToggleStatus(
-                          student.id
-                        );
-                      }}
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                        student.status ===
-                        "active"
-                          ? "bg-green-500/20 text-green-400"
-                          : "bg-red-500/20 text-red-400"
-                      }`}
-                    >
-                      {student.status ===
-                      "active"
-                        ? t(
-                            "active"
-                          )
-                        : t(
-                            "inactive"
-                          )}
-                    </button>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(
-                          event
-                        ) => {
-                          event.stopPropagation();
-
-                          openModal(
-                            "modify",
-                            student
-                          );
-                        }}
-                        className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg"
-                      >
-                        <Pencil
-                          size={
-                            16
-                          }
-                        />
-                      </button>
-
-                      <button
-                        onClick={(
-                          event
-                        ) => {
-                          event.stopPropagation();
-
-                          handleDelete(
-                            student.id
-                          );
-                        }}
-                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
-                      >
-                        <Trash2
-                          size={
-                            16
-                          }
-                        />
-                      </button>
-                    </div>
+            <tbody className="divide-y divide-white/5">
+              {filteredStudents.length ===
+              0 ? (
+                <tr>
+                  <td
+                    colSpan={20}
+                    className="text-center py-8 text-white/60"
+                  >
+                    {searchTerm
+                      ? "No students match your search"
+                      : "No students found"}
                   </td>
                 </tr>
-              )
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredStudents.map(
+                  (student, index) => (
+                    <tr
+                      key={
+                        student.id ||
+                        index
+                      }
+                      onClick={() =>
+                        setSelectedStudentForVoice(
+                          student
+                        )
+                      }
+                      className={`cursor-pointer border-t border-white/10 transition ${
+                        selectedStudentForVoice?.id ===
+                        student.id
+                          ? "bg-purple-500/10 ring-1 ring-inset ring-purple-500/40"
+                          : "hover:bg-white/5"
+                      }`}
+                    >
+                      {/* ID */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.id ||
+                          "—"}
+                      </td>
+
+                      {/* ADMISSION NO */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.admission_no ||
+                          "—"}
+                      </td>
+
+                      {/* NAME */}
+
+                      <td className="px-4 py-4 text-white font-medium text-sm">
+                        {translations?.[
+                          `studentName_${student.id}`
+                        ] ||
+                          student.name ||
+                          "—"}
+                      </td>
+
+                      {/* CLASS */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.class ||
+                          "—"}
+                      </td>
+
+                      {/* SECTION */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.section ||
+                          "—"}
+                      </td>
+
+                      {/* ROLL */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.roll_no ||
+                          "—"}
+                      </td>
+
+                      {/* PARENT 1 NAME */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {translations?.[
+                          `parentName_${student.id}`
+                        ] ||
+                          student.parent1_name ||
+                          "—"}
+                      </td>
+
+                      {/* PARENT 1 PHONE */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.parent1_phone ||
+                          "—"}
+                      </td>
+
+                      {/* PARENT 1 EMAIL */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.parent1_email ||
+                          "—"}
+                      </td>
+
+                      {/* PARENT 2 NAME */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.parent2_name ||
+                          "—"}
+                      </td>
+
+                      {/* PARENT 2 PHONE */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.parent2_phone ||
+                          "—"}
+                      </td>
+
+                      {/* PARENT 2 EMAIL */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.parent2_email ||
+                          "—"}
+                      </td>
+
+                      {/* STUDENT CONTACT */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.student_phone ||
+                          "—"}
+                      </td>
+
+                      {/* STUDENT EMAIL */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.student_email ||
+                          "—"}
+                      </td>
+
+                      {/* GUARDIAN NAME */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {translations?.[
+                          `guardianName_${student.id}`
+                        ] ||
+                          student.guardian_name ||
+                          "—"}
+                      </td>
+
+                      {/* GUARDIAN PHONE */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.guardian_phone ||
+                          "—"}
+                      </td>
+
+                      {/* GUARDIAN EMAIL */}
+
+                      <td className="px-4 py-4 text-white/80 text-sm">
+                        {student.guardian_email ||
+                          "—"}
+                      </td>
+
+                      {/* STATUS */}
+
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={(
+                            event
+                          ) => {
+                            event.stopPropagation();
+
+                            handleToggleStatus(
+                              student
+                            );
+                          }}
+                          className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            student.status ===
+                            "Active"
+                              ? "bg-green-500/20 text-green-400"
+                              : "bg-red-500/20 text-red-400"
+                          }`}
+                        >
+                          {student.status ===
+                          "Active"
+                            ? "● Active"
+                            : "○ Inactive"}
+                        </button>
+                      </td>
+
+                      {/* ACTIONS */}
+
+                      <td className="px-4 py-4">
+                        <div className="flex gap-2">
+                          {/* EDIT */}
+
+                          <button
+                            onClick={(
+                              event
+                            ) => {
+                              event.stopPropagation();
+
+                              openModal(
+                                "modify",
+                                student
+                              );
+                            }}
+                            className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg"
+                            title="Modify Student"
+                          >
+                            <Pencil
+                              size={16}
+                            />
+                          </button>
+
+                          {/* DELETE */}
+
+                          <button
+                            onClick={(
+                              event
+                            ) => {
+                              event.stopPropagation();
+
+                              handleDelete(
+                                student
+                              );
+                            }}
+                            className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
+                            title="Delete Student"
+                          >
+                            <Trash2
+                              size={16}
+                            />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* MODAL */}
+      {/* ======================================================
+          STUDENT FORM WIZARD
+      ====================================================== */}
 
       <AnimatePresence>
         {isModalOpen && (
-          <motion.div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
-            <motion.div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">
-                  {modalType ===
-                  "add"
-                    ? t(
-                        "addNewStudent"
-                      )
-                    : t(
-                        "modifyStudent"
-                      )}
-                </h2>
-
-                <button
-                  onClick={() =>
-                    setIsModalOpen(
-                      false
-                    )
-                  }
-                >
-                  <X
-                    size={24}
-                    className="text-white/40"
-                  />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder={t(
-                    "admissionNumber"
-                  )}
-                  value={
-                    formData.admissionNo
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      admissionNo:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="text"
-                  placeholder={t(
-                    "studentName"
-                  )}
-                  value={
-                    formData.name
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      name:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="text"
-                  placeholder={t(
-                    "class"
-                  )}
-                  value={
-                    formData.class
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      class:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="text"
-                  placeholder={t(
-                    "section"
-                  )}
-                  value={
-                    formData.section
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      section:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="text"
-                  placeholder={t(
-                    "rollNumber"
-                  )}
-                  value={
-                    formData.rollNo
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      rollNo:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="text"
-                  placeholder={t(
-                    "parentName"
-                  )}
-                  value={
-                    formData.parentName
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      parentName:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="tel"
-                  placeholder={t(
-                    "parentPhone"
-                  )}
-                  value={
-                    formData.parentPhone
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      parentPhone:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="email"
-                  placeholder={t(
-                    "parentEmailPlaceholder"
-                  )}
-                  value={
-                    formData.parentEmail
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      parentEmail:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="tel"
-                  placeholder={t(
-                    "studentContact"
-                  )}
-                  value={
-                    formData.contact
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      contact:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="email"
-                  placeholder={t(
-                    "studentEmailPlaceholder"
-                  )}
-                  value={
-                    formData.email
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      email:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="text"
-                  placeholder={t(
-                    "guardianName"
-                  )}
-                  value={
-                    formData.guardianName
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      guardianName:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-
-                <input
-                  type="tel"
-                  placeholder={t(
-                    "guardianPhone"
-                  )}
-                  value={
-                    formData.guardianPhone
-                  }
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      guardianPhone:
-                        event.target
-                          .value,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
-                />
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={
-                    modalType ===
-                    "add"
-                      ? handleAdd
-                      : handleModify
-                  }
-                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold"
-                >
-                  {modalType ===
-                  "add"
-                    ? t(
-                        "addStudent"
-                      )
-                    : t(
-                        "saveChanges"
-                      )}
-                </button>
-
-                <button
-                  onClick={() =>
-                    setIsModalOpen(
-                      false
-                    )
-                  }
-                  className="flex-1 py-3 bg-white/10 text-white rounded-xl font-semibold"
-                >
-                  {t("cancel")}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <StudentFormWizard
+            isOpen={isModalOpen}
+            onClose={
+              handleWizardClose
+            }
+            onSuccess={
+              handleWizardSuccess
+            }
+            editData={
+              editingStudent
+            }
+            theme="dark"
+          />
         )}
       </AnimatePresence>
     </div>

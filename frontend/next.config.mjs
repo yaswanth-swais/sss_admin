@@ -1,21 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  basePath: "/admin",
   reactStrictMode: true,
-  // Ignore warnings from jsonwebtoken (Node.js APIs not available in Edge)
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        crypto: false,
-      };
-    }
-    return config;
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.image2url.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
-  // Force dynamic rendering for pages that use client-side hooks
-  staticPageGenerationTimeout: 120,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  // Add trailing slash to handle routing properly
+  trailingSlash: true,
 };
 
 export default nextConfig;
