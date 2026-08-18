@@ -12,7 +12,7 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
-// Detect which table to use (sss_ or sgs_)
+// Detect which table to use (sss_ or sss_)
 async function getTableName() {
   // Check if sss_student_master exists
   const sssCheck = await pool.query(`
@@ -25,19 +25,6 @@ async function getTableName() {
   if (sssCheck.rows[0].exists) {
     console.log('📋 Using sss_student_master table');
     return 'sss_student_master';
-  }
-  
-  // Fallback to sgs_student_master
-  const sgsCheck = await pool.query(`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_name = 'sgs_student_master'
-    )
-  `);
-  
-  if (sgsCheck.rows[0].exists) {
-    console.log('📋 Using sgs_student_master table');
-    return 'sgs_student_master';
   }
   
   return null;
