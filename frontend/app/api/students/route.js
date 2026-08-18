@@ -57,7 +57,12 @@ export async function GET() {
       'guardian_name': ['guardian_name'],
       'guardian_phone': ['guardian_phone'],
       'guardian_email': ['guardian_email'],
-      'record_status': ['record_status', 'status']
+      'record_status': ['record_status', 'status'],
+      'student_photo_key': ['student_photo_key'],
+      'parent1_photo_key': ['parent1_photo_key'],
+      'parent2_photo_key': ['parent2_photo_key'],
+      'guardian_photo_key': ['guardian_photo_key']
+
     };
 
     for (const [asField, possibleColumns] of Object.entries(columnMap)) {
