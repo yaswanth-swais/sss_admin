@@ -5,6 +5,7 @@ from app.config import settings
 from app.database import Base, engine, check_db_connection
 from app.models import User  # noqa: F401 — ensure model is registered
 from app.routers import auth, user, admin, functions, warehouse
+from app.ai.ai_router import router as ai_router
 
 app = FastAPI(
     title="SWAIS API",
@@ -29,6 +30,7 @@ app.include_router(user.router)
 app.include_router(admin.router)
 app.include_router(functions.router)
 app.include_router(warehouse.router)
+app.include_router(ai_router)
 
 # Legacy alias — /api/warehouse-data → /warehouse/data
 from fastapi.responses import JSONResponse
