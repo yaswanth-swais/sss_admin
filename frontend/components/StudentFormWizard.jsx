@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 
-// Get the API base URL from environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+// Use a fallback for local development
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/admin/api';
 
 const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark' }) => {
   const [step, setStep] = useState(1);
@@ -58,11 +58,14 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
 
   // Fetch available classes
   useEffect(() => {
-    fetchAvailableClasses();
-  }, []);
+    if (isOpen) {
+      fetchAvailableClasses();
+    }
+  }, [isOpen]);
 
   const fetchAvailableClasses = async () => {
     try {
+      console.log('🔍 Fetching classes from:', `${API_BASE_URL}/classes`);
       const response = await fetch(`${API_BASE_URL}/classes`);
       if (response.ok) {
         const data = await response.json();
@@ -73,9 +76,10 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
     }
   };
 
-  // Reset form when modal opens
+  // Generate Student ID when modal opens
   useEffect(() => {
     if (isOpen && !editData) {
+      // Reset form first
       setFormData({
         admission_no: '',
         full_name: '',
@@ -97,6 +101,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       setClassInput('');
       setStep(1);
       setErrors({});
+      // Then generate ID
       generateStudentId();
     }
   }, [isOpen, editData]);
@@ -128,14 +133,21 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
 
   const generateStudentId = async () => {
     try {
-      console.log('🔍 Generating student ID...');
+      console.log('🔍 Generating student ID from:', `${API_BASE_URL}/generate-id?type=student`);
       const response = await fetch(`${API_BASE_URL}/generate-id?type=student`);
       const data = await response.json();
+      console.log('📝 Generated ID response:', data);
       if (data.id) {
         setFormData(prev => ({ ...prev, admission_no: data.id }));
+        console.log('✅ Set admission_no to:', data.id);
+      } else {
+        console.log('⚠️ No ID received, using fallback');
+        setFormData(prev => ({ ...prev, admission_no: 'S001' }));
       }
     } catch (error) {
       console.error('❌ Error generating ID:', error);
+      // Use fallback
+      setFormData(prev => ({ ...prev, admission_no: 'S001' }));
     }
   };
 
@@ -272,6 +284,7 @@ const StudentFormWizard = ({ isOpen, onClose, onSuccess, editData, theme = 'dark
       };
       
       console.log('📝 Sending payload:', payload);
+      console.log('📝 To URL:', url);
       
       const response = await fetch(url, {
         method: method,

@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
+  host: process.env.DB_HOST || 'swais-db-test-env.cri2kcc26kxg.ap-south-2.rds.amazonaws.com',
   port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'sss_prod',
+  user: process.env.DB_USER || 'swais_app_user',
+  password: process.env.DB_PASSWORD || 'Swaisuser007',
   ssl: { rejectUnauthorized: false },
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
@@ -40,38 +40,43 @@ function findColumn(possibleColumns, existingColumns) {
 
 // Detect which table to use (sss_ or sgs_)
 async function getTableName() {
-  // Check if sss_student_master exists
-  const sssCheck = await pool.query(`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_name = 'sss_student_master'
-    )
-  `);
-  
-  if (sssCheck.rows[0].exists) {
-    console.log('📋 Using sss_student_master table');
-    return 'sss_student_master';
+  try {
+    // Check if sss_student_master exists
+    const sssCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'sss_student_master'
+      )
+    `);
+    
+    if (sssCheck.rows[0].exists) {
+      console.log('📋 Using sss_student_master table');
+      return 'sss_student_master';
+    }
+    
+    // Fallback to sgs_student_master
+    const sgsCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'sgs_student_master'
+      )
+    `);
+    
+    if (sgsCheck.rows[0].exists) {
+      console.log('📋 Using sgs_student_master table');
+      return 'sgs_student_master';
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error checking tables:', error);
+    return null;
   }
-  
-  // Fallback to sgs_student_master
-  const sgsCheck = await pool.query(`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_name = 'sgs_student_master'
-    )
-  `);
-  
-  if (sgsCheck.rows[0].exists) {
-    console.log('📋 Using sgs_student_master table');
-    return 'sgs_student_master';
-  }
-  
-  return null;
 }
 
 export async function GET() {
   try {
-    console.log('🔍 Fetching students...');
+    console.log('🔍 GET - Fetching students...');
     
     const tableName = await getTableName();
     if (!tableName) {
@@ -82,7 +87,7 @@ export async function GET() {
     const existingColumns = await getExistingColumns(tableName);
     console.log('📋 Available columns:', existingColumns);
 
-    // Map frontend fields to database columns (support both SSS and SGS naming)
+    // Map frontend fields to database columns
     const columnMap = {
       'admission_no': ['admission_no', 'student_id'],
       'full_name': ['full_name', 'name', 'student_name'],
@@ -119,7 +124,25 @@ export async function GET() {
       query = `SELECT ${selectFields.join(', ')} FROM ${tableName}`;
       const statusCol = findColumn(['record_status', 'status', 'is_active'], existingColumns);
       if (statusCol) {
-        query += ` WHERE ${statusCol} = 'Active' OR ${statusCol} = true`;
+        // Check if the column type is text/varchar or boolean
+        try {
+          const colType = await pool.query(`
+            SELECT data_type 
+            FROM information_schema.columns 
+            WHERE table_name = $1 AND column_name = $2
+          `, [tableName, statusCol]);
+          
+          const dataType = colType.rows[0]?.data_type || '';
+          
+          if (dataType === 'boolean') {
+            query += ` WHERE ${statusCol} = true`;
+          } else {
+            query += ` WHERE ${statusCol} = 'Active'`;
+          }
+        } catch (error) {
+          console.error('Error checking column type:', error);
+          query += ` WHERE ${statusCol} = 'Active'`;
+        }
       }
       const idCol = findColumn(['admission_no', 'student_id'], existingColumns);
       if (idCol) {
@@ -140,7 +163,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log('📝 Received student data:', body);
+    console.log('📝 POST - Received student data:', body);
 
     const tableName = await getTableName();
     if (!tableName) {
@@ -181,7 +204,6 @@ export async function POST(request) {
       if (found) {
         insertColumns.push(found);
         let value = body[frontendKey] || null;
-        // Handle special cases
         if (frontendKey === 'class_id' && value) {
           value = parseInt(value) || null;
         }
@@ -193,7 +215,24 @@ export async function POST(request) {
     const statusCol = findColumn(['record_status', 'status', 'is_active'], existingColumns);
     if (statusCol) {
       insertColumns.push(statusCol);
-      values.push('Active');
+      // Check if column is boolean or text
+      try {
+        const colType = await pool.query(`
+          SELECT data_type 
+          FROM information_schema.columns 
+          WHERE table_name = $1 AND column_name = $2
+        `, [tableName, statusCol]);
+        
+        const dataType = colType.rows[0]?.data_type || '';
+        if (dataType === 'boolean') {
+          values.push(true);
+        } else {
+          values.push('Active');
+        }
+      } catch (error) {
+        console.error('Error checking column type:', error);
+        values.push('Active');
+      }
     }
 
     if (insertColumns.length === 0) {
@@ -243,7 +282,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    console.log('📝 Updating student:', body);
+    console.log('📝 PUT - Updating student:', body);
 
     const tableName = await getTableName();
     if (!tableName) {
@@ -294,7 +333,8 @@ export async function PUT(request) {
       'student_email': ['student_email'],
       'guardian_name': ['guardian_name'],
       'guardian_phone': ['guardian_phone'],
-      'guardian_email': ['guardian_email']
+      'guardian_email': ['guardian_email'],
+      'status': ['record_status', 'status', 'is_active']
     };
 
     const setClauses = [];
@@ -307,6 +347,23 @@ export async function PUT(request) {
         let value = body[frontendKey];
         if (frontendKey === 'class_id' && value) {
           value = parseInt(value) || null;
+        }
+        // Handle status/record_status specially
+        if (frontendKey === 'status') {
+          try {
+            const colType = await pool.query(`
+              SELECT data_type 
+              FROM information_schema.columns 
+              WHERE table_name = $1 AND column_name = $2
+            `, [tableName, found]);
+            
+            const dataType = colType.rows[0]?.data_type || '';
+            if (dataType === 'boolean') {
+              value = value === 'Active' || value === true;
+            }
+          } catch (error) {
+            console.error('Error checking column type for status:', error);
+          }
         }
         setClauses.push(`${found} = $${paramCounter}`);
         values.push(value);
@@ -381,9 +438,26 @@ export async function DELETE(request) {
       );
     }
 
+    // Check column type for status
+    let deleteValue = 'Deleted';
+    try {
+      const colType = await pool.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = $1 AND column_name = $2
+      `, [tableName, statusCol]);
+      
+      const dataType = colType.rows[0]?.data_type || '';
+      if (dataType === 'boolean') {
+        deleteValue = false;
+      }
+    } catch (error) {
+      console.error('Error checking column type for delete:', error);
+    }
+
     const result = await pool.query(
-      `UPDATE ${tableName} SET ${statusCol} = 'Deleted' WHERE ${idCol} = $1 RETURNING *`,
-      [id]
+      `UPDATE ${tableName} SET ${statusCol} = $1 WHERE ${idCol} = $2 RETURNING *`,
+      [deleteValue, id]
     );
 
     if (result.rows.length === 0) {
