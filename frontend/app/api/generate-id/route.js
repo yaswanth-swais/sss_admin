@@ -86,32 +86,58 @@ export async function GET(request) {
     
     console.log(`📋 Table: ${tableName}, ID Column: ${idCol}`);
     
-    // Get the highest ID
-    const result = await pool.query(
-      `SELECT ${idCol} FROM ${tableName} 
-       WHERE ${idCol} LIKE $1 
-       AND ${idCol} ~ '^[A-Z][0-9]+$' 
-       ORDER BY ${idCol} DESC LIMIT 1`,
-      [`${prefix}%`]
-    );
+    // Get the highest ID - using multiple methods to ensure we get it
+    let maxNumber = 0;
     
-    let nextNumber = 1;
-    if (result.rows.length > 0) {
-      const lastId = result.rows[0][idCol];
-      console.log(`📝 Last ID from DB: ${lastId}`);
+    // Method 1: Get all IDs and find the max
+    try {
+      const result = await pool.query(
+        `SELECT ${idCol} FROM ${tableName} 
+         WHERE ${idCol} LIKE $1 
+         AND ${idCol} ~ '^[A-Z][0-9]+$' 
+         ORDER BY ${idCol} DESC`,
+        [`${prefix}%`]
+      );
       
-      // Extract the number part
-      const numPart = parseInt(lastId.replace(prefix, ''));
-      if (!isNaN(numPart) && numPart > 0) {
-        nextNumber = numPart + 1;
-        console.log(`📊 Next number: ${nextNumber}`);
+      console.log(`📊 Found ${result.rows.length} existing ${type} IDs`);
+      
+      if (result.rows.length > 0) {
+        // Get the first one (highest)
+        const lastId = result.rows[0][idCol];
+        console.log(`📝 Last ID from DB: ${lastId}`);
+        
+        // Extract the number part
+        const numPart = parseInt(lastId.replace(prefix, ''));
+        if (!isNaN(numPart) && numPart > 0) {
+          maxNumber = numPart;
+          console.log(`📊 Highest number found: ${maxNumber}`);
+        }
       }
-    } else {
-      console.log('📊 No existing IDs found, starting from 1');
+    } catch (error) {
+      console.error('Error fetching IDs:', error);
     }
     
+    // Method 2: If method 1 failed, try a different query
+    if (maxNumber === 0) {
+      try {
+        const result = await pool.query(
+          `SELECT MAX(CAST(SUBSTRING(${idCol} FROM 2) AS INTEGER)) as max_num
+           FROM ${tableName} 
+           WHERE ${idCol} ~ '^[A-Z][0-9]+$'`
+        );
+        
+        if (result.rows[0]?.max_num) {
+          maxNumber = parseInt(result.rows[0].max_num);
+          console.log(`📊 Max number from SUBSTRING: ${maxNumber}`);
+        }
+      } catch (error) {
+        console.error('Error with SUBSTRING method:', error);
+      }
+    }
+    
+    const nextNumber = maxNumber + 1;
     const newId = `${prefix}${String(nextNumber).padStart(3, '0')}`;
-    console.log(`✅ Generated ${type} ID: ${newId}`);
+    console.log(`✅ Generated ${type} ID: ${newId} (next number: ${nextNumber})`);
     
     return NextResponse.json({ id: newId });
   } catch (error) {

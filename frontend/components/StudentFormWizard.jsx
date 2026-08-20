@@ -112,8 +112,10 @@ const [guardianPhotoPreview, setGuardianPhotoPreview] = useState(null);
   // =========================================================
 
   useEffect(() => {
-    fetchAvailableClasses();
-  }, []);
+    if (isOpen) {
+      fetchAvailableClasses();
+    }
+  }, [isOpen]);
 
   const fetchAvailableClasses = async () => {
     try {
@@ -174,6 +176,7 @@ const [guardianPhotoPreview, setGuardianPhotoPreview] = useState(null);
       setClassInput('');
       setStep(1);
       setErrors({});
+      // Then generate ID
       generateStudentId();
     }
   }, [isOpen, editData]);
